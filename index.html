@@ -133,7 +133,7 @@ window.API_URL = window.API_URL || 'https://script.google.com/macros/s/AKfycbxei
 </script>
 <script>
 'use strict';
-const TZ = 'Asia/Jayapura', VERSI = '1.4.1';
+const TZ = 'Asia/Jayapura', VERSI = '1.4.3';
 const $app = document.getElementById('app');
 const st = { info: null, lang: simpan('lang') || 'id', petugas: simpanJ('petugas'), cache: {}, segar: {}, terbang: {} };
 function simpan(k, v) { try { if (v === undefined) return localStorage.getItem('rf_' + k); if (v === null) localStorage.removeItem('rf_' + k); else localStorage.setItem('rf_' + k, v); } catch (e) { return null; } }
@@ -222,8 +222,8 @@ function detikMuat() {
   pil.hidden = false; pil.innerHTML = `<span class="pantul kecil"><i class="bola"></i><i class="riak"></i></span>${esc((lemah || labelMuat) + '…' + dtk)}`;
 }
 /* ---- catatan kecepatan (lihat #/diagnosa) ---- */
-function catatDiag(aksi, total, server, cache) {
-  try { const L = JSON.parse(localStorage.getItem('rf_diag') || '[]'); L.unshift({ a: aksi, t: Math.round(total), s: server == null ? null : server, c: !!cache, w: kiniWit().slice(5, 16) }); localStorage.setItem('rf_diag', JSON.stringify(L.slice(0, 40))); } catch (e) {}
+function catatDiag(aksi, total, server, cache, galat) {
+  try { const L = JSON.parse(localStorage.getItem('rf_diag') || '[]'); L.unshift({ a: aksi, t: Math.round(total), s: server == null ? null : server, c: !!cache, w: kiniWit().slice(5, 16), e: galat || undefined }); localStorage.setItem('rf_diag', JSON.stringify(L.slice(0, 40))); } catch (e) {}
 }
 const BUKAN_TULIS = { cekBooking: 1, login: 1, waPengingat: 1, daftarKontraktor: 1 };
 function bacaSimpanan(k) { try { const x = JSON.parse(localStorage.getItem(k) || 'null'); return x && x.r ? x : null; } catch (e) { return null; } }
@@ -235,18 +235,38 @@ function basikanSimpanan() {
     if (PUBLIK_CEPAT.test(k)) { const x = bacaSimpanan(k); if (x) { x.t = 0; localStorage.setItem(k, JSON.stringify(x)); } } else localStorage.removeItem(k);
   }); } catch (e) {}
 }
+/** galat jaringan dipilah: SERVER (Google membalas tapi bukan data aplikasi), WAKTU (terlalu lama), OFFLINE, JARINGAN (sambungan putus di tengah jalan) */
+function galatKirim(jenis, ket) { const e = new Error(jenis); e.jenis = jenis; e.ket = ket || ''; return e; }
 async function kirim(aksi, body, opsi) {
-  const ctl = new AbortController(), w = setTimeout(() => ctl.abort(), opsi.batas || 30000), t0 = performance.now();
+  const ctl = new AbortController(), w = setTimeout(() => ctl.abort(), opsi.batas || (BACA[aksi] ? 30000 : 45000)), t0 = performance.now();
   try {
-    const r = await fetch(window.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' }), j = await r.json();
+    let r, teks;
+    try { r = await fetch(window.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' }); teks = await r.text(); }
+    catch (e) { throw galatKirim(e.name === 'AbortError' ? 'WAKTU' : navigator.onLine === false ? 'OFFLINE' : 'JARINGAN', String(e.message || e).slice(0, 80)); }
+    let j = null; try { j = JSON.parse(teks); } catch (e) {}
+    if (!j || typeof j !== 'object') throw galatKirim('SERVER', 'HTTP ' + r.status + ' · ' + String(teks || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80));
     catatDiag(aksi, performance.now() - t0, j.ms, j.cache); return j;
-  } finally { clearTimeout(w); }
+  } catch (e) { if (e.jenis) catatDiag(aksi, performance.now() - t0, null, false, e.jenis + (e.ket ? ' · ' + e.ket : '')); throw e; }
+  finally { clearTimeout(w); }
+}
+/** aksi tulis yang aman dikirim ulang (server mengenali permintaan yang sama) */
+const AMAN_ULANG = { pesanBarber: 1, pesanKaraoke: 1, batalPemesan: 1 };
+function pesanJaringan(jenis, aksi) {
+  const en = st.lang === 'en', tulis = !BACA[aksi];
+  if (jenis === 'SERVER') return en ? 'Google server is busy. Please try again shortly.' : 'Server Google sedang sibuk. Coba lagi sebentar, ya.';
+  if (jenis === 'WAKTU') return AMAN_ULANG[aksi] ? (en ? 'Weak signal: no reply yet. Tap again — it will not create a double booking.' : 'Sinyal lemah, jawaban server belum sampai. Tekan sekali lagi — booking tidak akan dobel.') : (en ? 'The server took too long (weak signal). Please try again.' : 'Server terlalu lama menjawab (sinyal lemah). Coba lagi, ya.');
+  if (jenis === 'OFFLINE') return en ? 'You are offline. Check your signal or Wi-Fi.' : 'HP sedang offline. Cek sinyal atau Wi-Fi, ya.';
+  return tulis && AMAN_ULANG[aksi] ? (en ? 'Connection dropped. Tap again — it will not create a double booking.' : 'Koneksi terputus. Tekan sekali lagi — booking tidak akan dobel.') : (en ? 'No connection. Please try again.' : 'Koneksi terputus. Coba lagi sebentar, ya.');
 }
 /** beberapa data baca dalam SATU perjalanan ke server */
 async function apiPaket(daftar, opsi = {}) {
-  const r = await api('paket', { daftar }, opsi);
-  if (!r.ok) return daftar.map(() => r);
-  return r.data.map(x => x.ok && r.basi ? Object.assign({ basi: true }, x) : x);
+  if (!st.tanpaPaket) {
+    const r = await api('paket', { daftar }, opsi);
+    if (r.ok) return r.data.map(x => x.ok && r.basi ? Object.assign({ basi: true }, x) : x);
+    if (!(r.error && r.error.kode === 'AKSI')) return daftar.map(() => r);
+    st.tanpaPaket = true; // server masih versi lama: tetap jalan dengan permintaan terpisah
+  }
+  return Promise.all(daftar.map(q => { const p = Object.assign({}, q); delete p.aksi; return api(q.aksi, p, opsi); }));
 }
 /**
  * opsi.cepat: tampilkan data terakhir yang tersimpan di HP SEKETIKA, lalu perbarui diam-diam dari server.
@@ -268,7 +288,9 @@ async function api(aksi, p = {}, opsi = {}) {
   try {
     // data yang sama sedang diambil (mis. disiapkan di belakang)? tunggu yang itu saja, jangan kirim dua kali
     let janji = BACA[aksi] && st.terbang[kunci];
-    if (!janji) { janji = kirim(aksi, body, opsi); if (BACA[aksi]) { st.terbang[kunci] = janji; janji.then(() => delete st.terbang[kunci], () => delete st.terbang[kunci]); } }
+    // sinyal putus/server Google sibuk sesaat: data baca & aksi yang aman diulang dicoba sekali lagi otomatis
+    const kirimUlang = () => kirim(aksi, body, opsi).catch(e => (e.jenis === 'JARINGAN' || e.jenis === 'SERVER') && (BACA[aksi] || AMAN_ULANG[aksi]) ? new Promise(r => setTimeout(r, 800)).then(() => kirim(aksi, body, opsi)) : Promise.reject(e));
+    if (!janji) { janji = kirimUlang(); if (BACA[aksi]) { st.terbang[kunci] = janji; janji.then(() => delete st.terbang[kunci], () => delete st.terbang[kunci]); } }
     const j = await janji;
     setOffline(false);
     if (j.ok && BACA[aksi]) { try { localStorage.setItem(kunci, JSON.stringify({ t: Date.now(), r: j })); } catch (e) {} }
@@ -276,10 +298,11 @@ async function api(aksi, p = {}, opsi = {}) {
     if (!j.ok && j.error && j.error.kode === 'SESI') { st.petugas = null; simpanJ('petugas', null); }
     return j;
   } catch (e) {
-    setOffline(true);
+    const jenis = e.jenis || 'JARINGAN';
+    if (jenis === 'OFFLINE' || jenis === 'JARINGAN') setOffline(true);
     if (BACA[aksi]) { const x = bacaSimpanan(kunci); if (x) { x.r.basi = true; return x.r; } }
-    if (ANTRE[aksi]) { const q = simpanJ('antrean') || []; body.waktu_offline = kiniWit(); q.push(body); simpanJ('antrean', q); return { ok: true, data: { offline: true }, antre: true }; }
-    return { ok: false, error: { kode: 'JARINGAN', pesan: st.lang === 'en' ? 'No connection. Please try again.' : 'Koneksi terputus. Coba lagi sebentar, ya.' } };
+    if (ANTRE[aksi] && jenis !== 'SERVER') { const q = simpanJ('antrean') || []; body.waktu_offline = kiniWit(); q.push(body); simpanJ('antrean', q); return { ok: true, data: { offline: true }, antre: true }; }
+    return { ok: false, error: { kode: jenis === 'SERVER' ? 'SERVER' : 'JARINGAN', jenis, pesan: pesanJaringan(jenis, aksi) } };
   } finally { if (!opsi.diam) muatSelesai(); }
 }
 async function perbaruiBelakang(aksi, body, kunci, lama) {
@@ -294,7 +317,7 @@ async function perbaruiBelakang(aksi, body, kunci, lama) {
     if (aksi === 'info') { st.info = j.data; st.infoWaktu = Date.now(); }
     const sibuk = document.getElementById('lapis') || /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
     if (beda && location.hash === hash && !sibuk) { st.gulir = window.scrollY; router(true); }
-  } catch (e) { setOffline(true); }
+  } catch (e) { if (e.jenis === 'OFFLINE' || e.jenis === 'JARINGAN') setOffline(true); }
   finally { delete st.segar[kunci]; muatSelesai(); }
 }
 async function kirimAntrean() {
@@ -324,6 +347,7 @@ const IK = {
   mik: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0B5A55" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg>',
   bintang: (isi, uk = 22) => `<svg width="${uk}" height="${uk}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.1l-5.62 3 1.07-6.27L2.9 9.4l6.3-.9z" fill="${isi ? '#F2A93B' : '#fff'}" stroke="${isi ? '#C77D0A' : '#A9B4B1'}" stroke-width="1.3"/></svg>`,
   cek: '<svg class="gambar-cek" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5"/></svg>',
+  rumah: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>',
   gembok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
   gelas: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9A4F00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10l-1 18H8L7 3Z"/><path d="M7.4 9h9.2M12 3l2-2"/></svg>'
 };
@@ -378,7 +402,9 @@ async function layarMenu() {
       <div class="baris" style="flex-wrap:wrap;gap:14px">${b.istirahat.map((x, i) => `<div class="kolom" style="gap:1px"><b class="num" style="font-size:14px">${x}</b><span class="mini" style="color:#C7D0D6">${esc((b.istirahatNama || [])[i] || t('Makan & ibadah'))}</span></div>`).join('')}
       <div class="kolom" style="gap:1px"><b class="num" style="font-size:14px">${b.tutup}</b><span class="mini" style="color:#C7D0D6">${st.lang === 'en' ? 'Barbershop closes' : 'Barbershop tutup'}</span></div></div></div>
     <div class="dua"><a class="btn putih kcl" href="#/papan">${t('Jadwal hari ini')}</a><a class="btn putih kcl" href="#/saran">${t('Kirim masukan')}</a></div>
-    <a href="#/petugas" class="kecil" style="text-align:center;padding:12px">${t('Masuk sebagai petugas')}</a>
+    ${st.petugas ? `<div class="kartu antara" style="background:var(--tinta);color:#fff;border:0"><div class="kolom" style="gap:1px"><span class="mini" style="color:#C7D0D6">${st.lang === 'en' ? 'Signed in as' : 'Kamu masuk sebagai'} ${st.petugas.petugas.peran === 'KAPSTER' ? 'Kapster' : st.petugas.petugas.peran === 'SPV' ? 'SPV' : 'Admin'}</span><b>${esc(st.petugas.petugas.nama)}</b></div>
+      <div class="baris" style="gap:6px"><a class="btn kcl" href="${layarPetugasUtama()}" style="width:auto;padding:10px 14px;background:var(--amber);color:var(--tinta)">${st.lang === 'en' ? 'Open' : 'Buka layar'} ${st.petugas.petugas.peran === 'KAPSTER' ? 'kapster' : 'SPV'}</a><button class="btn kcl" data-act="logout" style="width:auto;padding:10px 12px;background:transparent;border:1.5px solid #4A5A66">${st.lang === 'en' ? 'Sign out' : 'Keluar'}</button></div></div>`
+    : `<a href="#/petugas" class="kecil" style="text-align:center;padding:12px">${t('Masuk sebagai petugas')}</a>`}
   </div>`);
 }
 
@@ -569,7 +595,10 @@ async function layarFormBarber() {
   ${lay.untuk === 'Wanita' && st.setujuPria ? `<div class="kecil" style="padding:0 20px 10px;color:#1F4E78">✓ ${t('Kamu setuju dilayani kapster pria')}</div>` : ''}
   <div class="bawah"><button class="btn" data-act="kirimB">${t('Booking sekarang')}</button></div>`);
 }
-function simpanKode(b, idb) { const L = simpanJ('kode') || []; if (!L.some(x => x.kode === b.kode)) L.unshift({ kode: b.kode, id: idb, layanan: b.layanan, tanggal: b.tanggal, jam: b.jam }); simpanJ('kode', L.slice(0, 20)); }
+function simpanKode(b, idb) { const L = simpanJ('kode') || []; if (!L.some(x => x.kode === b.kode)) L.unshift({ kode: b.kode, id: String(idb || '').toUpperCase(), layanan: b.layanan, tanggal: b.tanggal, jam: b.jam, b }); simpanJ('kode', L.slice(0, 20)); }
+/** simpan status terakhir yang diketahui, supaya booking tetap tampil walau server belum bisa dihubungi */
+function ingatStatus(daftar) { const L = simpanJ('kode') || []; let ubah = false; daftar.forEach(b => { const x = b && !b.sementara && L.find(k => k.kode === b.kode); if (x) { const salin = Object.assign({}, b); delete salin.basi; x.b = salin; x.tanggal = b.tanggal; x.jam = b.jam; ubah = true; } }); if (ubah) simpanJ('kode', L); }
+function bookingSementara(x) { return Object.assign({ kode: x.kode, layanan: x.layanan, tanggal: x.tanggal, jam: x.jam, status: 'AKTIF' }, x.b || {}, { sementara: true }); }
 
 async function layarSukses(kode) {
   const L = simpanJ('kode') || [], x = L.find(k => k.kode === kode); if (!x) return go('#/saya');
@@ -622,14 +651,25 @@ async function layarSaya(kodeAktif) {
     hasil = L.slice(0, 8).map(x => kenal.find(b => b.kode === x.kode));
     if (!st.segar[kunci]) perbaruiBelakang('paket', { aksi: 'paket', bahasa: st.lang, daftar }, kunci, { r: { data: [] } });
   } else hasil = L.length ? (await apiPaket(daftar, { cepat: true })).map(r => r.ok ? r.data : null) : [];
-  st.bookingSaya = hasil.filter(Boolean);
-  const aktif = kodeAktif ? hasil.find(b => b && b.kode === kodeAktif) : null;
+  ingatStatus(hasil);
+  // SEMUA kode yang tersimpan di HP selalu tampil. Bila status terbaru belum bisa diambil, pakai status terakhir yang diketahui.
+  const semua = L.map((x, i) => (i < 8 && hasil[i]) || bookingSementara(x)), adaSementara = semua.slice(0, 8).some(b => b.sementara);
+  st.bookingSaya = semua.filter(b => !b.sementara);
+  const aktif = kodeAktif ? semua.find(b => b.kode === kodeAktif) : null;
+  const chip = b => b.sementara && !b.selesai ? `<span class="chip">${t('Belum diperbarui')}</span>` : `<span class="chip ${b.status.indexOf('BATAL') === 0 ? 'merah' : b.bisaNilai ? 'amber' : 'hijau'}">${b.bisaNilai ? t('Beri ulasan') : esc({ AKTIF: t('Aktif'), SELESAI: t('Selesai'), MENUNGGU_FAV: t('Menunggu persetujuan kapster'), BERLANGSUNG: t('Sedang dilayani'), HADIR: t('Sedang dilayani'), TIDAK_DATANG: t('Tidak datang') }[b.status] || t('Batal'))}</span>`;
   tampil(kepala(t('Booking saya'), t('Lihat jadwal, batalkan, atau beri ulasan')) + `<div class="isi">
-    ${aktif ? kartuBooking(aktif) + aksiBooking(aktif) : ''}
+    ${adaSementara ? `<div class="kartu antara" role="status" style="background:#FCE9D2;border:0;color:#4A2800;gap:10px"><span class="kecil" style="color:inherit">${st.lang === 'en' ? 'Some statuses could not be refreshed (weak signal). Your bookings are still saved.' : 'Sebagian status belum bisa diperbarui karena sinyal lemah. Booking kamu tetap tersimpan.'}</span><button class="btn putih kcl" style="width:auto;flex:none" data-act="muatUlangSaya">${t('Muat ulang')}</button></div>` : ''}
+    ${aktif ? (aktif.sementara && !aktif.selesai ? kartuSementara(aktif) : kartuBooking(aktif) + (aktif.sementara ? '' : aksiBooking(aktif))) : ''}
     <section class="kolom"><span class="label">${t('Riwayat booking di HP ini')}</span>
-      ${hasil.filter(Boolean).length ? hasil.filter(Boolean).map(b => `<a class="kartu antara" style="text-decoration:none" href="#/saya/${b.kode}"><div class="kolom" style="gap:2px"><b class="num">${b.kode} · ${b.layanan === 'BARBER' ? 'Barbershop' : 'Karaoke'}</b><span class="kecil">${tgl(b.tanggal, true)} · ${b.jam}</span></div><span class="chip ${b.status.indexOf('BATAL') === 0 ? 'merah' : b.bisaNilai ? 'amber' : 'hijau'}">${b.bisaNilai ? t('Beri ulasan') : esc({ AKTIF: t('Aktif'), SELESAI: t('Selesai'), MENUNGGU_FAV: t('Menunggu persetujuan kapster'), BERLANGSUNG: t('Sedang dilayani'), HADIR: t('Sedang dilayani'), TIDAK_DATANG: t('Tidak datang') }[b.status] || t('Batal'))}</span></a>`).join('') : `<div class="kecil">${t('Belum ada booking. Yuk, pilih jadwal pertamamu!')}</div>`}</section>
+      ${semua.length ? semua.map(b => `<a class="kartu antara" style="text-decoration:none" href="#/saya/${b.kode}"><div class="kolom" style="gap:2px"><b class="num">${b.kode} · ${b.layanan === 'BARBER' ? 'Barbershop' : 'Karaoke'}</b><span class="kecil">${tgl(b.tanggal, true)} · ${b.jam}</span></div>${chip(b)}</a>`).join('') : `<div class="kecil">${t('Belum ada booking. Yuk, pilih jadwal pertamamu!')}</div>`}</section>
     <section class="kartu kolom"><b>${t('Cari booking')}</b><input id="c-kode" class="inp" placeholder="${t('Kode booking (mis. BRB-7Q4K)')}" autocapitalize="characters" maxlength="12"><input id="c-id" class="inp" placeholder="${t('No. ID badge')}" autocapitalize="characters" maxlength="20"><button class="btn kcl" data-act="cari">${t('Cari')}</button></section>
   </div>`);
+}
+function kartuSementara(b) {
+  return `<div class="kartu" style="border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px;text-align:center"><span class="label">${t('Kode booking')}</span><b class="num" style="font-size:32px;letter-spacing:.06em">${esc(b.kode)}</b>
+    <span class="kecil">${b.layanan === 'BARBER' ? 'Barbershop' : 'Karaoke Room'} · ${tgl(b.tanggal)}${b.jam ? ' · ' + esc(b.jam) : ''}</span>
+    <span class="kecil">${st.lang === 'en' ? 'Booking saved on this phone. Details will appear once the signal is better.' : 'Booking tersimpan di HP ini. Rincian lengkap muncul setelah sinyal membaik.'}</span>
+    <button class="btn kcl" data-act="muatUlangSaya">${t('Muat ulang')}</button></div>`;
 }
 function aksiBooking(b) {
   return `<div class="kolom">${b.bisaNilai ? `<a class="btn" href="#/nilai/${b.kode}">${t('Beri ulasan')}</a>` : ''}
@@ -723,15 +763,16 @@ async function layarLogin() {
   tampil(`<div class="gelap" style="min-height:100vh;display:flex;flex-direction:column;padding:20px 24px 28px;gap:20px">
     <a class="kembali" href="#/" aria-label="Kembali" style="background:var(--gelap);border-color:var(--gelap2);color:#fff">${IK.kembali}</a>
     <div class="kolom" style="gap:6px"><h1 style="font-size:28px">Masuk petugas</h1><p style="margin:0;color:#C7D0D6;line-height:1.5">Untuk Admin, SPV, dan Kapster. Setiap aksi tercatat atas nama kamu.</p></div>
-    <div class="fld"><label for="l-id">Nama petugas</label><select id="l-id" class="inp" style="background:var(--gelap);border-color:var(--gelap2);color:#fff">${daftar.map(p => `<option value="${p.id}" ${simpan('petugasTerakhir') === p.id ? 'selected' : ''}>${esc(p.nama)} — ${p.peran === 'KAPSTER' ? 'Kapster' : p.peran === 'SPV' ? 'SPV' : 'Admin'}</option>`).join('')}</select></div>
+    <div class="fld"><label for="l-id">Nama petugas</label><select id="l-id" class="inp" style="background:var(--gelap);border-color:var(--gelap2);color:#fff">${[['ADMIN', 'Admin'], ['SPV', 'SPV Facility Management'], ['KAPSTER', 'Kapster']].map(([pr, lb]) => { const x = daftar.filter(p => p.peran === pr); return x.length ? `<optgroup label="${lb}">${x.map(p => `<option value="${p.id}" ${simpan('petugasTerakhir') === p.id ? 'selected' : ''}>${esc(p.nama)}</option>`).join('')}</optgroup>` : ''; }).join('')}</select></div>
     <div class="kolom" style="align-items:center;gap:10px"><span style="align-self:flex-start;font-weight:700;font-size:14px">PIN 6 angka</span><div class="baris" id="titik" style="gap:12px" aria-live="polite"></div></div>
     <div class="tiga" style="gap:10px">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map(k => k === '' ? '<span></span>' : `<button data-act="pin" data-k="${k}" aria-label="${k === '⌫' ? 'Hapus' : k}" style="font-size:22px;font-weight:700;color:#fff;background:var(--gelap);border:1px solid var(--gelap2);border-radius:14px;min-height:60px">${k}</button>`).join('')}</div>
     <div style="flex-grow:1"></div><button class="btn" data-act="masuk" style="background:var(--amber);color:var(--tinta)">Masuk</button></div>`);
   gambarTitik();
 }
 function gambarTitik() { const el = document.getElementById('titik'); if (el) el.innerHTML = [0, 1, 2, 3, 4, 5].map(i => `<span style="width:16px;height:16px;border-radius:999px;${i < st.loginPin.length ? 'background:var(--amber)' : 'border:2px solid #4A5A66'}"></span>`).join(''); }
-function perluLogin(peran) { if (!st.petugas) { go('#/petugas'); return true; } if (peran && peran.indexOf(st.petugas.petugas.peran) < 0 && st.petugas.petugas.peran !== 'ADMIN') { go(st.petugas.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv'); return true; } return false; }
-function keluarAkun() { st.petugas = null; simpanJ('petugas', null); hapusSimpanan(); go('#/petugas'); }
+function perluLogin(peran) { if (!st.petugas) { go('#/petugas', true); return true; } if (peran && peran.indexOf(st.petugas.petugas.peran) < 0 && st.petugas.petugas.peran !== 'ADMIN') { go(st.petugas.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv/pantau', true); return true; } return false; }
+function keluarAkun() { st.petugas = null; simpanJ('petugas', null); hapusSimpanan(); go('#/', true); toast(st.lang === 'en' ? 'You have signed out.' : 'Kamu sudah keluar dari akun petugas.'); }
+function layarPetugasUtama() { return st.petugas.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv/pantau'; }
 /** ambil diam-diam data layar berikutnya yang paling mungkin dibuka, supaya terbuka seketika */
 function siapkanDulu() {
   if (!navigator.onLine) return; // tiap data hanya diambil bila belum ada / sudah lebih dari 1 menit / basi setelah booking
@@ -776,7 +817,7 @@ async function layarKapster() {
   });
   const rating = D.rataNilai ? `★ ${String(D.rataNilai).replace('.', ',')} · kepuasan 7 hari (${D.jumlahNilai} nilai)` : 'Belum ada penilaian minggu ini';
   tampil(`<div class="gelap" style="padding:18px 20px 16px;display:flex;flex-direction:column;gap:12px">
-      <div class="antara"><div class="kolom" style="gap:2px"><span class="label" style="color:var(--amber)">Kapster · Barbershop</span><b style="font-size:20px">${esc(u.nama)}</b><span style="font-size:12px;color:var(--amber);font-weight:700">${rating}</span></div>
+      <div class="antara"><div class="baris" style="gap:12px"><a class="kembali" href="#/" aria-label="Ke beranda" style="background:var(--gelap);border-color:var(--gelap2);color:#fff">${IK.rumah}</a><div class="kolom" style="gap:2px"><span class="label" style="color:var(--amber)">Kapster · Barbershop</span><b style="font-size:20px">${esc(u.nama)}</b><span style="font-size:12px;color:var(--amber);font-weight:700">${rating}</span></div></div>
         <div class="kolom" style="align-items:flex-end;gap:4px"><b class="num" style="font-size:22px">${kiniWit().slice(11, 16).replace(':', '.')}</b><span class="pil" style="background:${statusWarna};color:${statusWarna === '#F2C48B' ? '#16212B' : '#fff'}">${esc(D.status.teks)}</span></div></div>
       ${fav.map(b => `<div class="kolom" style="background:#1F4E78;border-radius:14px;padding:12px;gap:8px"><span class="kecil" style="color:#DDEBF7"><b style="color:#fff">${esc(b.nama)}</b> (${esc(b.perusahaan)}) minta dilayani kamu · ${esc(b.jam)}</span><div class="dua"><button class="btn kcl" data-act="fav" data-k="${b.kode}" data-s="1" style="background:var(--hijau3);color:#0B2E2B">Setujui</button><button class="btn kcl" data-act="fav" data-k="${b.kode}" data-s="0" style="background:transparent;border:1.5px solid #DDEBF7">Tidak bisa</button></div></div>`).join('')}
       <div style="background:var(--gelap);border:1px solid var(--gelap2);border-radius:16px;padding:14px">${kartuUtama}</div></div>
@@ -806,11 +847,18 @@ async function layarSemua() {
 }
 
 /* ---- SPV ---- */
+const SERVER_MIN = '1.4.1'; // versi Code.gs yang dibutuhkan tampilan ini
+function versiLebihLama(a, b) { const x = String(a || '0').split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0); } return false; }
+function peringatanVersi() {
+  const v = st.info && st.info.versi; if (!v || !versiLebihLama(v, SERVER_MIN)) return '';
+  return `<div class="kecil" style="background:#FCE9D2;color:#4A2800;border-radius:12px;padding:10px 12px;line-height:1.45"><b>Server masih versi ${esc(v)}, aplikasi butuh ${SERVER_MIN}.</b> Tempel Code.gs terbaru di Apps Script, jalankan setup, lalu Deploy → Manage deployments → New version. Aplikasi tetap jalan, tapi beberapa layar lebih lambat.</div>`;
+}
 function navSpv(aktif) {
   const T = [['pantau', 'Pantau'], ['booking', 'Booking'], ['rekap', 'Rekap'], ['aturan', 'Aturan']];
-  return `<div class="gelap" style="padding:18px 20px 12px;display:flex;flex-direction:column;gap:12px"><div class="antara"><div class="kolom" style="gap:2px"><span class="label" style="color:var(--amber)">SPV Facility Management</span><b style="font-size:20px">${esc(st.petugas.petugas.nama)}</b></div>
+  return `<div class="gelap" style="padding:18px 20px 12px;display:flex;flex-direction:column;gap:12px"><div class="antara"><div class="baris" style="gap:12px"><a class="kembali" href="#/" aria-label="Ke beranda" style="background:var(--gelap);border-color:var(--gelap2);color:#fff">${IK.rumah}</a><div class="kolom" style="gap:2px"><span class="label" style="color:var(--amber)">${st.petugas.petugas.peran === 'ADMIN' ? 'Admin' : 'SPV Facility Management'}</span><b style="font-size:20px">${esc(st.petugas.petugas.nama)}</b></div></div>
     <div class="kolom" style="align-items:flex-end;gap:2px"><b class="num" style="font-size:22px">${kiniWit().slice(11, 16).replace(':', '.')}</b><button data-act="logout" style="background:none;border:0;color:#C7D0D6;font-size:12px;text-decoration:underline;padding:4px 0">Keluar akun</button></div></div>
-    <nav class="tab gelap2" style="grid-template-columns:repeat(4,minmax(0,1fr))">${T.map(([k, l]) => `<button class="${k === aktif ? 'on' : ''}" data-go="#/spv/${k}">${l}</button>`).join('')}</nav></div>`;
+    ${peringatanVersi()}
+    <nav class="tab gelap2" style="grid-template-columns:repeat(4,minmax(0,1fr))">${T.map(([k, l]) => `<button class="${k === aktif ? 'on' : ''}" data-go="#/spv/${k}" data-ganti="1">${l}</button>`).join('')}</nav></div>`;
 }
 async function layarSpv(tab) {
   if (perluLogin(['SPV', 'ADMIN'])) return;
@@ -995,11 +1043,12 @@ function layarDiagnosa() {
     <div class="tiga">${[[f(tot), 'Total (median)'], [f(srv), 'Proses server'], [f(jar), 'Sinyal + Google']].map(x => `<div class="kartu" style="padding:10px;text-align:center"><b class="num" style="font-size:18px;display:block">${x[0]}</b><span class="mini">${x[1]}</span></div>`).join('')}</div>
     <div class="kecil"><b>Total</b> = dari tombol ditekan sampai data diterima HP. <b>Proses server</b> = kerja Apps Script membaca Google Sheet. <b>Sinyal + Google</b> = sisanya: perjalanan data lewat jaringan site dan antrean server Google. Bila bagian ini paling besar, penyebabnya jaringan/server Google, bukan aplikasi.</div>
     <div class="dua"><button class="btn kcl" data-act="ujiCepat">Uji sekarang (3×)</button><button class="btn putih kcl" data-act="hapusDiag">Hapus catatan</button></div>
-    <div class="kartu" style="padding:4px 14px">${L.map(x => `<div class="antara" style="padding:8px 0;border-bottom:1px solid #EEF1EF;font-size:13px"><span><b>${esc(x.a)}</b><br><span class="mini">${esc(x.w)}${x.c ? ' · dari simpanan server' : ''}</span></span><span class="num" style="text-align:right"><b>${f(x.t)}</b><br><span class="mini">server ${f(x.s)}</span></span></div>`).join('') || '<div class="kecil" style="padding:10px 0">Belum ada catatan. Pakai aplikasi sebentar, lalu buka halaman ini lagi.</div>'}</div></div>`);
+    <div class="kartu" style="padding:4px 14px">${L.map(x => `<div class="antara" style="padding:8px 0;border-bottom:1px solid #EEF1EF;font-size:13px"><span><b>${esc(x.a)}</b><br><span class="mini">${esc(x.w)}${x.c ? ' · dari simpanan server' : ''}</span>${x.e ? `<br><span class="mini" style="color:var(--merah,#C0392B)">Gagal: ${esc(x.e)}</span>` : ''}</span><span class="num" style="text-align:right"><b>${f(x.t)}</b><br><span class="mini">server ${f(x.s)}</span></span></div>`).join('') || '<div class="kecil" style="padding:10px 0">Belum ada catatan. Pakai aplikasi sebentar, lalu buka halaman ini lagi.</div>'}</div></div>`);
 }
 
 /* ================= AKSI ================= */
-function go(h) { if (location.hash === h) router(); else location.hash = h; }
+/** pindah layar. ganti=true: halaman sekarang TIDAK disimpan di riwayat (tombol kembali tidak memutar ke layar pengalih seperti login) */
+function go(h, ganti) { if (location.hash === h) return router(); if (ganti) { history.replaceState(null, '', h); router(); } else location.hash = h; }
 function unduhCsv(nama, baris) {
   const csv = '﻿' + baris.map(r => r.map(x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"').join(';')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = nama; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -1019,7 +1068,7 @@ document.addEventListener('change', e => {
 document.addEventListener('input', e => { if (e.target.id === 'cariK') { st.cariK = e.target.value; clearTimeout(st.tCariK); st.tCariK = setTimeout(() => { spvKontraktor().then(() => { const c = document.getElementById('cariK'); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); } }); }, 350); return; } if (e.target.id === 'cariB') { st.cariB = e.target.value; clearTimeout(st.tCari); st.tCari = setTimeout(() => { spvBooking().then(() => { const c = document.getElementById('cariB'); if (c) { c.focus(); c.setSelectionRange(c.value.length, c.value.length); } }); }, 400); } });
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act],[data-go],[data-lang]'); if (!el) return;
-  if (el.dataset.go) { go(el.dataset.go); return; }
+  if (el.dataset.go) { go(el.dataset.go, el.dataset.ganti === '1'); return; }
   if (el.dataset.lang) { st.lang = el.dataset.lang; simpan('lang', st.lang); document.documentElement.lang = st.lang; router(); return; }
   const a = el.dataset.act, k = el.dataset.k;
   if (a === 'setuju') { const j = el.dataset.j, on = sessionStorage.getItem('setuju_' + j) === '1'; sessionStorage.setItem('setuju_' + j, on ? '0' : '1'); layarAturan(j); }
@@ -1048,7 +1097,8 @@ document.addEventListener('click', async e => {
   else if (a === 'batal') {
     lembar(`<b style="font-size:18px">${t('Yakin membatalkan booking ini?')}</b><span class="kecil">${esc(k)}</span><div class="dua"><button class="btn putih" data-act="tutup">${t('Tidak jadi')}</button><button class="btn merah" data-act="batalYa" data-k="${k}">${t('Ya, batalkan')}</button></div>`);
   }
-  else if (a === 'batalYa') { const x = (simpanJ('kode') || []).find(z => z.kode === k); const r = await jalankan('batalPemesan', { kode: k, id_badge: x.id }, st.lang === 'en' ? 'Booking cancelled.' : 'Booking dibatalkan.'); tutupLembar(); if (r) layarSaya(k); }
+  else if (a === 'muatUlangSaya') { st.bookingBaru = null; st.bookingSaya = null; try { Object.keys(localStorage).filter(x => /^rf_c_(paket|cekBooking)/.test(x)).forEach(x => localStorage.removeItem(x)); } catch (e) {} router(); }
+  else if (a === 'batalYa') { const x = (simpanJ('kode') || []).find(z => z.kode === k); if (!x) { tutupLembar(); return go('#/saya'); } const r = await jalankan('batalPemesan', { kode: k, id_badge: x.id }, st.lang === 'en' ? 'Booking cancelled.' : 'Booking dibatalkan.'); tutupLembar(); if (r) layarSaya(k); }
   else if (a === 'tutup') tutupLembar();
   else if (a === 'bintang') { st.nilai.n = +el.dataset.n; st.nilai.saran = (document.getElementById('n-saran') || {}).value; layarNilaiUlang(); }
   else if (a === 'aspek') { const x = el.dataset.a, L = st.nilai.aspek; st.nilai.aspek = L.includes(x) ? L.filter(y => y !== x) : L.concat(x); st.nilai.saran = (document.getElementById('n-saran') || {}).value; layarNilaiUlang(); }
@@ -1070,7 +1120,7 @@ document.addEventListener('click', async e => {
     const id = document.getElementById('l-id').value; if (st.loginPin.length !== 6) return toast('Masukkan PIN 6 angka.', true);
     el.disabled = true; const r = await api('login', { petugas_id: id, pin: st.loginPin }, { token: false }); el.disabled = false; st.loginPin = ''; gambarTitik();
     if (!r.ok) return toast(pesanGalat(r), true);
-    st.petugas = r.data; simpanJ('petugas', r.data); simpan('petugasTerakhir', id); kirimAntrean(); go(r.data.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv/pantau');
+    st.petugas = r.data; simpanJ('petugas', r.data); simpan('petugasTerakhir', id); kirimAntrean(); go(r.data.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv/pantau', true);
   }
   else if (a === 'logout') keluarAkun();
   else if (a === 'gantiPin') lembar(`<b style="font-size:18px">Ganti PIN</b><input id="p-lama" class="inp" type="password" inputmode="numeric" maxlength="6" placeholder="PIN lama"><input id="p-baru" class="inp" type="password" inputmode="numeric" maxlength="6" placeholder="PIN baru (6 angka)"><button class="btn" data-act="gantiPinYa">Simpan PIN baru</button>`);
@@ -1163,7 +1213,7 @@ async function router(latar) {
       case 'saran': await pastikanInfo(); return layarSaran();
       case 'papan': return await layarPapan();
       case 'diagnosa': return layarDiagnosa();
-      case 'petugas': return st.petugas ? go(st.petugas.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv/pantau') : await layarLogin();
+      case 'petugas': return st.petugas ? go(layarPetugasUtama(), true) : await layarLogin();
       case 'kapster': await pastikanInfo(); return seg[1] === 'semua' ? await layarSemua() : await layarKapster();
       case 'spv': await pastikanInfo(); return seg[1] === 'dashboard' ? await layarDashboard() : await layarSpv(seg[1]);
       default: return go('#/');

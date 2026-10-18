@@ -1,7 +1,7 @@
 /* Simpan tampilan aplikasi di HP agar terbuka cepat walau sinyal lemah.
    Data booking TIDAK disimpan di sini (selalu diambil dari server).
    Setiap kali index.html diubah, naikkan angka VERSI di bawah supaya HP mengambil versi baru. */
-const VERSI = 'rf-1.4.2';
+const VERSI = 'rf-1.4.3';
 const BERKAS = ['./', 'index.html', 'manifest.webmanifest', 'logo-kso-gdsk-pid.png', 'ikon-64.png', 'ikon-192.png', 'ikon-512.png'];
 
 self.addEventListener('install', e => {

@@ -68,6 +68,14 @@ h2{margin:0;font-size:20px;font-weight:800}
 .offline{background:var(--amber);color:var(--tinta);text-align:center;font-size:13px;font-weight:700;padding:6px}
 .pil{font-size:11px;font-weight:700;padding:4px 8px;border-radius:999px;flex-shrink:0}
 .muat{padding:40px 20px;text-align:center;color:var(--abu)}
+#bilah{position:fixed;left:0;top:0;height:3px;width:100%;z-index:60;pointer-events:none;opacity:0;transition:opacity .25s;background:linear-gradient(90deg,transparent 0,var(--hijau) 30%,var(--amber) 50%,var(--hijau) 70%,transparent 100%);background-size:50% 100%;background-repeat:no-repeat}
+#bilah.on{opacity:1;animation:geser 1.1s ease-in-out infinite}
+#bilah.selesai{opacity:0}
+@keyframes geser{0%{background-position:-50% 0}100%{background-position:150% 0}}
+#pil-muat{position:fixed;left:50%;top:12px;transform:translateX(-50%);z-index:61;background:var(--tinta);color:#fff;font-size:13px;font-weight:700;padding:8px 14px;border-radius:999px;box-shadow:0 4px 14px rgba(0,0,0,.2);white-space:nowrap}
+.rangka{display:flex;flex-direction:column;gap:12px;padding:20px}
+.rangka i{display:block;border-radius:14px;background:linear-gradient(90deg,#E4E9E7 25%,#F1F4F2 50%,#E4E9E7 75%);background-size:200% 100%;animation:kilau 1.2s linear infinite}
+@keyframes kilau{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .putar{width:28px;height:28px;border:3px solid #C9D1CF;border-top-color:var(--hijau);border-radius:50%;margin:0 auto 10px;animation:putar .8s linear infinite}
 .bar{height:8px;border-radius:999px;background:#E4E8E6;overflow:hidden}.bar i{display:block;height:100%;border-radius:999px;transform-origin:left;animation:tumbuh .5s ease-out both}
 @keyframes naik{from{transform:translate(-50%,16px);opacity:0}}
@@ -84,6 +92,8 @@ h2{margin:0;font-size:20px;font-weight:800}
 </style>
 </head>
 <body>
+<div id="bilah" role="progressbar" aria-label="Memuat"></div>
+<div id="pil-muat" role="status" aria-live="polite" hidden></div>
 <div id="app"><div class="muat"><div class="putar"></div>Memuat…</div></div>
 <script>
 /* ===== KONFIGURASI: isi dengan URL Web App Apps Script (lihat PANDUAN-PEMASANGAN.md) ===== */
@@ -91,9 +101,9 @@ window.API_URL = window.API_URL || 'https://script.google.com/macros/s/AKfycbxei
 </script>
 <script>
 'use strict';
-const TZ = 'Asia/Jayapura', VERSI = '1.1.0';
+const TZ = 'Asia/Jayapura', VERSI = '1.2.0';
 const $app = document.getElementById('app');
-const st = { info: null, lang: simpan('lang') || 'id', petugas: simpanJ('petugas'), cache: {} };
+const st = { info: null, lang: simpan('lang') || 'id', petugas: simpanJ('petugas'), cache: {}, segar: {} };
 function simpan(k, v) { try { if (v === undefined) return localStorage.getItem('rf_' + k); if (v === null) localStorage.removeItem('rf_' + k); else localStorage.setItem('rf_' + k, v); } catch (e) { return null; } }
 function simpanJ(k, v) { if (v === undefined) { try { return JSON.parse(simpan(k) || 'null'); } catch (e) { return null; } } simpan(k, v === null ? null : JSON.stringify(v)); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -148,26 +158,79 @@ function jam(x) { return String(Math.floor(x / 60)).padStart(2, '0') + '.' + Str
 const BACA = { info: 1, jadwalBarber: 1, jadwalKaraoke: 1, papan: 1, daftarPetugas: 1, jadwalKapster: 1, pantau: 1, daftarBooking: 1, rekap: 1, aturJadwal: 1, karaokeKelola: 1, saranTerbaru: 1, pengaturan: 1, riwayatApresiasi: 1 };
 const ANTRE = { mulaiKerja: 1, kembaliIstirahat: 1, keluar: 1, kembaliKeluar: 1, mulaiLayani: 1, selesaiLayani: 1 };
 let offline = false;
+/* ---- penanda loading: bilah atas + hitungan detik bila lama ---- */
+let jmlMuat = 0, mulaiMuat = 0, tMuat = null;
+function muatMulai() {
+  if (jmlMuat++ > 0) return;
+  mulaiMuat = Date.now(); document.getElementById('bilah').className = 'on';
+  clearInterval(tMuat); tMuat = setInterval(detikMuat, 500);
+}
+function muatSelesai() {
+  if (--jmlMuat > 0) return;
+  jmlMuat = 0; clearInterval(tMuat);
+  const b = document.getElementById('bilah'); b.className = 'selesai'; setTimeout(() => { if (!jmlMuat) b.className = ''; }, 400);
+  document.getElementById('pil-muat').hidden = true;
+}
+function detikMuat() {
+  const d = Math.floor((Date.now() - mulaiMuat) / 1000), en = st.lang === 'en', pil = document.getElementById('pil-muat');
+  const teks = d >= 12 ? (en ? `Weak signal, still trying… ${d}s` : `Sinyal lemah, tetap mencoba… ${d} dtk`) : (en ? `Connecting to server… ${d}s` : `Menghubungkan ke server… ${d} dtk`);
+  const di = document.getElementById('muat-dtk');
+  if (di) { pil.hidden = true; if (d >= 2) di.textContent = teks; } // kerangka sudah menampilkan pesan
+  else if (d >= 2) { pil.hidden = false; pil.textContent = teks; }
+}
+const BUKAN_TULIS = { cekBooking: 1, login: 1, waPengingat: 1, daftarKontraktor: 1 };
+function bacaSimpanan(k) { try { const x = JSON.parse(localStorage.getItem(k) || 'null'); return x && x.r ? x : null; } catch (e) { return null; } }
+function hapusSimpanan() { try { Object.keys(localStorage).filter(k => k.indexOf('rf_c_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {} }
+async function kirim(aksi, body, opsi) {
+  const ctl = new AbortController(), w = setTimeout(() => ctl.abort(), opsi.batas || 30000);
+  try { const r = await fetch(window.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' }); return await r.json(); }
+  finally { clearTimeout(w); }
+}
+/**
+ * opsi.cepat: tampilkan data terakhir yang tersimpan di HP SEKETIKA, lalu perbarui diam-diam dari server.
+ * Ketersediaan jam tetap dicek ulang oleh server saat pemesan menekan Konfirmasi.
+ */
 async function api(aksi, p = {}, opsi = {}) {
   const body = Object.assign({ aksi, bahasa: st.lang }, p);
   if (st.petugas && opsi.token !== false) body.token = st.petugas.token;
-  const kunci = 'c_' + aksi + JSON.stringify(p);
+  const kunci = 'rf_c_' + aksi + JSON.stringify(p);
   if (!window.API_URL) return { ok: false, error: { kode: 'KONFIG', pesan: 'Alamat server belum diisi (API_URL).' } };
+  if (opsi.cepat && BACA[aksi]) {
+    const lama = bacaSimpanan(kunci);
+    if (lama) {
+      if (Date.now() - lama.t > 10000 && !st.segar[kunci]) perbaruiBelakang(aksi, body, kunci, lama);
+      return lama.r;
+    }
+  }
+  if (!opsi.diam) muatMulai();
   try {
-    const ctl = new AbortController(), w = setTimeout(() => ctl.abort(), opsi.batas || 20000);
-    const r = await fetch(window.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' });
-    clearTimeout(w);
-    const j = await r.json();
+    const j = await kirim(aksi, body, opsi);
     setOffline(false);
-    if (j.ok && BACA[aksi]) { try { localStorage.setItem('rf_' + kunci, JSON.stringify(j)); } catch (e) {} }
+    if (j.ok && BACA[aksi]) { try { localStorage.setItem(kunci, JSON.stringify({ t: Date.now(), r: j })); } catch (e) {} }
+    else if (j.ok && !BUKAN_TULIS[aksi]) hapusSimpanan(); // ada perubahan data → jadwal di HP harus diambil ulang
     if (!j.ok && j.error && j.error.kode === 'SESI') { st.petugas = null; simpanJ('petugas', null); }
     return j;
   } catch (e) {
     setOffline(true);
-    if (BACA[aksi]) { const c = simpanJ(kunci.slice(0)); try { const x = JSON.parse(localStorage.getItem('rf_' + kunci) || 'null'); if (x) { x.basi = true; return x; } } catch (er) {} }
+    if (BACA[aksi]) { const x = bacaSimpanan(kunci); if (x) { x.r.basi = true; return x.r; } }
     if (ANTRE[aksi]) { const q = simpanJ('antrean') || []; body.waktu_offline = kiniWit(); q.push(body); simpanJ('antrean', q); return { ok: true, data: { offline: true }, antre: true }; }
     return { ok: false, error: { kode: 'JARINGAN', pesan: st.lang === 'en' ? 'No connection. Please try again.' : 'Koneksi terputus. Coba lagi sebentar, ya.' } };
-  }
+  } finally { if (!opsi.diam) muatSelesai(); }
+}
+async function perbaruiBelakang(aksi, body, kunci, lama) {
+  st.segar[kunci] = 1; const hash = location.hash;
+  muatMulai();
+  try {
+    const j = await kirim(aksi, body, {});
+    setOffline(false);
+    if (!j.ok) return;
+    const beda = JSON.stringify(j.data) !== JSON.stringify(lama.r.data);
+    try { localStorage.setItem(kunci, JSON.stringify({ t: Date.now(), r: j })); } catch (e) {}
+    if (aksi === 'info') { st.info = j.data; st.infoWaktu = Date.now(); }
+    const sibuk = document.getElementById('lapis') || /^(INPUT|SELECT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
+    if (beda && location.hash === hash && !sibuk) { st.gulir = window.scrollY; router(true); }
+  } catch (e) { setOffline(true); }
+  finally { delete st.segar[kunci]; muatSelesai(); }
 }
 async function kirimAntrean() {
   const q = simpanJ('antrean') || []; if (!q.length || !window.API_URL) return;
@@ -200,15 +263,25 @@ const IK = {
   gelas: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9A4F00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10l-1 18H8L7 3Z"/><path d="M7.4 9h9.2M12 3l2-2"/></svg>'
 };
 function kepala(judul, sub, ke = '#/') { return `<div class="atas"><div class="baris"><a class="kembali" href="${ke}" aria-label="Kembali">${IK.kembali}</a><div class="kolom" style="gap:1px"><h2>${judul}</h2>${sub ? `<div class="kecil">${sub}</div>` : ''}</div></div></div>`; }
-function tampil(html, lebar) { $app.className = lebar ? 'lebar' : ''; $app.innerHTML = `<div id="offline" class="offline" ${offline ? '' : 'hidden'}>${t('Mode offline: menampilkan data terakhir.')}</div>` + html; window.scrollTo(0, 0); }
-function memuat() { $app.innerHTML = '<div class="muat"><div class="putar"></div>' + (st.lang === 'en' ? 'Loading…' : 'Memuat…') + '</div>'; }
+function tampil(html, lebar) {
+  st.dirender = st.nav; $app.className = lebar ? 'lebar' : '';
+  $app.innerHTML = `<div id="offline" class="offline" ${offline ? '' : 'hidden'}>${t('Mode offline: menampilkan data terakhir.')}</div>` + html;
+  if (st.gulir != null) { window.scrollTo(0, st.gulir); st.gulir = null; } else window.scrollTo(0, 0);
+}
+/** kerangka halaman berkilau selagi data diambil (muncul hanya bila menunggu > 0,15 dtk) */
+function memuat() {
+  $app.className = '';
+  $app.innerHTML = `<div class="rangka" aria-busy="true"><i style="height:44px;width:44px"></i><i style="height:30px;width:70%"></i><i style="height:16px;width:90%"></i>
+    <i style="height:96px"></i><i style="height:96px"></i><i style="height:60px"></i>
+    <div class="kecil" id="muat-dtk" style="text-align:center;margin-top:6px">${st.lang === 'en' ? 'Loading…' : 'Memuat…'}</div></div>`;
+}
 function lembar(html) { tutupLembar(); const l = document.createElement('div'); l.className = 'lapis'; l.id = 'lapis'; l.innerHTML = `<div class="lembar" role="dialog" aria-modal="true">${html}</div>`; l.addEventListener('click', e => { if (e.target === l) tutupLembar(); }); document.body.appendChild(l); const f = l.querySelector('input,select,textarea,button'); if (f) f.focus(); }
 function tutupLembar() { const l = document.getElementById('lapis'); if (l) l.remove(); }
 function emph(s) { return esc(s).replace(/(\d{1,2}\.\d{2}(?:–\d{1,2}\.\d{2})?(?: WIT)?|maks\. \d+ \w+|max\. \d+ \w+|\d+(?:–\d+)? (?:menit|jam|orang|sesi|hari ke depan|minutes?|hours?|people|session|days ahead)|Booking Saya|My bookings|Tambah ke Kalender|H-1|D-1|GRATIS|FREE|QRIS|kode booking|No\. ID badge)/g, '<strong>$1</strong>'); }
 
 async function pastikanInfo(paksa) {
   if (st.info && !paksa && Date.now() - st.infoWaktu < 600000) return st.info;
-  const r = await api('info');
+  const r = await api('info', {}, { cepat: true });
   if (r.ok) { st.info = r.data; st.infoWaktu = Date.now(); }
   else if (!st.info) throw r;
   return st.info;
@@ -217,8 +290,8 @@ async function pastikanInfo(paksa) {
 /* ================= LAYAR PEMESAN ================= */
 async function layarMenu() {
   const I = await pastikanInfo(true), b = I.barber;
-  const jb = await api('jadwalBarber');
-  const kosong = jb.ok ? jb.data.hari[0].slot.filter(s => s.status === 'kosong').length : '–';
+  const kosong = I.kosongHariIni == null ? '–' : I.kosongHariIni;
+  setTimeout(siapkanDulu, 300);
   tampil(`<div class="atas" style="padding-top:20px">
     <div class="antara"><img src="logo-kso-gdsk-pid.png" alt="KSO GDSK-PID" width="140" height="36" style="height:34px;width:auto">
       <div class="baris" style="gap:0;border:1px solid #C9D1CF;border-radius:999px;overflow:hidden;font-size:13px;font-weight:700">
@@ -321,7 +394,7 @@ async function layarBarber() {
   if (sessionStorage.getItem('setuju_b') !== '1') return go('#/aturan/b');
   const lay = simpanJ('layanan'); if (!lay) return go('#/barber');
   await pastikanInfo();
-  const r = await api('jadwalBarber', { layanan_id: lay.id });
+  const r = await api('jadwalBarber', { layanan_id: lay.id }, { cepat: true });
   if (!r.ok) { if (r.error && r.error.kode === 'DATA') { simpanJ('layanan', null); return go('#/barber'); } return layarGalat(r); }
   const D = r.data, I = st.info, en = st.lang === 'en', L = D.layanan;
   simpanJ('layanan', L);
@@ -509,7 +582,7 @@ async function layarKaraoke() {
   if (sessionStorage.getItem('setuju_k') !== '1') return go('#/aturan/k');
   const I = await pastikanInfo(); const d = simpanJ('pemesan') || {};
   const pid = st.ptK || d.pt || '';
-  const r = await api('jadwalKaraoke', pid ? { perusahaan_id: pid } : {}); if (!r.ok) return layarGalat(r);
+  const r = await api('jadwalKaraoke', pid ? { perusahaan_id: pid } : {}, { cepat: true }); if (!r.ok) return layarGalat(r);
   const D = r.data, pt = I.kontraktor.find(k => k.id === pid), pemilik = pt && pt.jenis === 'Pemilik', P = D.putaran;
   const habis = !pemilik && D.sisa === 0;
   const sel = pilihan.k;
@@ -548,7 +621,7 @@ async function layarFormKaraoke() {
 
 /* ---- Papan jadwal ---- */
 async function layarPapan() {
-  const r = await api('papan'); if (!r.ok) return layarGalat(r);
+  const r = await api('papan', {}, { cepat: true }); if (!r.ok) return layarGalat(r);
   const D = r.data;
   tampil(kepala(t('Jadwal hari ini'), tgl(D.tanggal) + ' · ' + D.jam + ' WIT') + `<div class="isi">
     <section class="kolom"><span class="label">Barbershop</span><div class="kartu" style="padding:6px 14px">${D.barber.map(s => `<div class="antara" style="padding:9px 0;border-bottom:1px solid #EEF1EF"><b class="num">${s.jam}</b><span class="${s.status === 'kosong' ? 'chip hijau' : s.status === 'terisi' ? '' : 'mini'}" style="font-weight:700">${s.status === 'terisi' ? esc(s.perusahaan) : s.status === 'kosong' ? t('Kosong') : s.status === 'lewat' ? t('Sudah lewat') : t('Tutup')}</span></div>`).join('')}</div></section>
@@ -562,7 +635,7 @@ function layarGalat(r) {
 
 /* ================= PETUGAS ================= */
 async function layarLogin() {
-  const r = await api('daftarPetugas', {}, { token: false }); if (!r.ok) return layarGalat(r);
+  const r = await api('daftarPetugas', {}, { token: false, cepat: true }); if (!r.ok) return layarGalat(r);
   st.loginPin = '';
   const daftar = r.data;
   tampil(`<div class="gelap" style="min-height:100vh;display:flex;flex-direction:column;padding:20px 24px 28px;gap:20px">
@@ -576,7 +649,14 @@ async function layarLogin() {
 }
 function gambarTitik() { const el = document.getElementById('titik'); if (el) el.innerHTML = [0, 1, 2, 3, 4, 5].map(i => `<span style="width:16px;height:16px;border-radius:999px;${i < st.loginPin.length ? 'background:var(--amber)' : 'border:2px solid #4A5A66'}"></span>`).join(''); }
 function perluLogin(peran) { if (!st.petugas) { go('#/petugas'); return true; } if (peran && peran.indexOf(st.petugas.petugas.peran) < 0 && st.petugas.petugas.peran !== 'ADMIN') { go(st.petugas.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv'); return true; } return false; }
-function keluarAkun() { st.petugas = null; simpanJ('petugas', null); go('#/petugas'); }
+function keluarAkun() { st.petugas = null; simpanJ('petugas', null); hapusSimpanan(); go('#/petugas'); }
+/** ambil diam-diam data layar berikutnya yang paling mungkin dibuka, supaya terbuka seketika */
+function siapkanDulu() {
+  if (!navigator.onLine || st.disiapkan && Date.now() - st.disiapkan < 60000) return; st.disiapkan = Date.now();
+  const lay = simpanJ('layanan'), pt = (simpanJ('pemesan') || {}).pt;
+  const tugas = [['jadwalBarber', { layanan_id: (lay && lay.id) || 'PL' }], ['jadwalKaraoke', pt ? { perusahaan_id: pt } : {}]];
+  tugas.forEach(([a, p]) => { const k = 'rf_c_' + a + JSON.stringify(p), x = bacaSimpanan(k); if (!x || Date.now() - x.t > 60000) api(a, p, { diam: true }); });
+}
 
 async function layarKapster() {
   if (perluLogin(['KAPSTER', 'SPV', 'ADMIN'])) return;
@@ -967,8 +1047,8 @@ function gambarKeluar() {
 }
 
 /* ================= ROUTER ================= */
-async function router() {
-  tutupLembar();
+async function router(latar) {
+  if (!latar) { tutupLembar(); const no = st.nav = (st.nav || 0) + 1; setTimeout(() => { if (st.nav === no && st.dirender !== no) memuat(); }, 150); }
   const h = location.hash || '#/', seg = h.replace(/^#\//, '').split('/');
   try {
     if (!st.info && seg[0] !== 'petugas' && seg[0] !== 'kapster' && seg[0] !== 'spv') memuat();
@@ -989,7 +1069,7 @@ async function router() {
     }
   } catch (e) { console.error(e); layarGalat(e && e.error ? e : { error: { pesan: String(e && e.message || e) } }); }
 }
-addEventListener('hashchange', router);
+addEventListener('hashchange', () => router());
 document.documentElement.lang = st.lang;
 router(); kirimAntrean();
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -78,6 +78,18 @@ h2{margin:0;font-size:20px;font-weight:800}
 .rangka{display:flex;flex-direction:column;gap:12px;padding:20px}
 .rangka i{display:block;border-radius:14px;background:linear-gradient(90deg,#E4E9E7 25%,#F1F4F2 50%,#E4E9E7 75%);background-size:200% 100%;animation:kilau 1.2s linear infinite}
 @keyframes kilau{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.titik{display:inline-flex;gap:3px;margin-right:8px;vertical-align:middle}.titik i{width:6px;height:6px;border-radius:99px;background:var(--amber);animation:loncat 1s ease-in-out infinite}
+.titik.hijau i{background:var(--hijau)}.titik i:nth-child(2){animation-delay:.15s}.titik i:nth-child(3){animation-delay:.3s}
+@keyframes loncat{0%,80%,100%{transform:translateY(0);opacity:.5}40%{transform:translateY(-5px);opacity:1}}
+/* animasi masuk halaman: hanya opacity & transform (ringan, tidak menunda data) */
+#app.masuk .atas,#app.masuk .isi>*,#app.masuk .p>*,#app.masuk .bawah{animation:muncul .34s cubic-bezier(.2,.8,.2,1) both}
+#app.masuk .isi>*:nth-child(2){animation-delay:.03s}#app.masuk .isi>*:nth-child(3){animation-delay:.06s}#app.masuk .isi>*:nth-child(4){animation-delay:.09s}
+#app.masuk .isi>*:nth-child(5){animation-delay:.12s}#app.masuk .isi>*:nth-child(6){animation-delay:.15s}#app.masuk .isi>*:nth-child(n+7){animation-delay:.18s}
+#app.masuk .bawah{animation-name:naikBawah}
+@keyframes muncul{from{opacity:0;transform:translateY(10px)}}
+@keyframes naikBawah{from{transform:translateY(100%)}}
+.gambar-cek path{stroke-dasharray:24;stroke-dashoffset:24;animation:goresCek .45s .25s ease-out forwards}
+@keyframes goresCek{to{stroke-dashoffset:0}}
 .putar{width:28px;height:28px;border:3px solid #C9D1CF;border-top-color:var(--hijau);border-radius:50%;margin:0 auto 10px;animation:putar .8s linear infinite}
 .bar{height:8px;border-radius:999px;background:#E4E8E6;overflow:hidden}.bar i{display:block;height:100%;border-radius:999px;transform-origin:left;animation:tumbuh .5s ease-out both}
 @keyframes naik{from{transform:translate(-50%,16px);opacity:0}}
@@ -103,9 +115,9 @@ window.API_URL = window.API_URL || 'https://script.google.com/macros/s/AKfycbxei
 </script>
 <script>
 'use strict';
-const TZ = 'Asia/Jayapura', VERSI = '1.3.0';
+const TZ = 'Asia/Jayapura', VERSI = '1.4.0';
 const $app = document.getElementById('app');
-const st = { info: null, lang: simpan('lang') || 'id', petugas: simpanJ('petugas'), cache: {}, segar: {} };
+const st = { info: null, lang: simpan('lang') || 'id', petugas: simpanJ('petugas'), cache: {}, segar: {}, terbang: {} };
 function simpan(k, v) { try { if (v === undefined) return localStorage.getItem('rf_' + k); if (v === null) localStorage.removeItem('rf_' + k); else localStorage.setItem('rf_' + k, v); } catch (e) { return null; } }
 function simpanJ(k, v) { if (v === undefined) { try { return JSON.parse(simpan(k) || 'null'); } catch (e) { return null; } } simpan(k, v === null ? null : JSON.stringify(v)); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -113,27 +125,27 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ 
 /* ---------------- bahasa ---------------- */
 const KAMUS = {
   en: {
-    'Mau booking apa?': 'What would you like to book?', 'Pilih layanan, baca aturannya, lalu ambil jam yang masih kosong. Tidak perlu akun.': 'Choose a service, read the rules, then pick an open time. No account needed.',
-    'Potong rambut + cukur jenggot & kumis': 'Haircut + beard & mustache trim', 'jam kosong hari ini': 'open today', 'Bayar non-tunai di kasir': 'Cashless payment at the cashier',
-    'Gratis': 'Free', 'Cek jatah perusahaanmu': 'Check your company quota', 'Booking saya': 'My bookings', 'Cek jadwal, batalkan, atau beri nilai & saran': 'Check, cancel, or rate & review',
-    'Barbershop tutup sementara': 'Barbershop break times', 'Makan & ibadah': 'Meals & prayer', 'Tutup': 'Closed', 'Jadwal hari ini': "Today's schedule", 'Masuk petugas (Admin / SPV / Kapster)': 'Staff sign-in (Admin / SPV / Barber)',
-    'Aturan reservasi': 'Booking rules', 'Baca sebentar sebelum memesan': 'Take a moment before booking', 'Saya sudah membaca dan': 'I have read and', 'menyetujui aturan reservasi': 'agree to the booking rules',
-    'Setujui aturan untuk lanjut': 'Agree to the rules to continue', 'Lanjut pilih jam': 'Continue to pick a time', 'Lanjut pilih hari': 'Continue to pick a day',
+    'Mau booking apa?': 'What would you like to book?', 'Booking barbershop & karaoke tanpa antre. Cukup pakai ID badge, tanpa bikin akun.': 'Book the barbershop & karaoke without queuing. Just your ID badge, no account needed.',
+    'Potong rambut + cukur jenggot & kumis': 'Haircut + beard & mustache trim', 'jam kosong hari ini': 'open today', 'Bayar QRIS/kartu di kasir': 'Pay by QRIS/card at the cashier',
+    'Gratis': 'Free', 'Cek & pilih jadwalmu': 'Check & pick your schedule', 'Booking saya': 'My bookings', 'Lihat jadwal, batalkan, atau beri ulasan': 'View, cancel, or review your bookings',
+    'Jam istirahat kapster': 'Barber break times', 'Makan & ibadah': 'Meals & prayer', 'Tutup': 'Closed', 'Jadwal hari ini': "Today's schedule", 'Masuk sebagai petugas': 'Staff sign-in',
+    'Aturan reservasi': 'Booking rules', 'Baca dulu sebelum booking, cuma 1 menit': 'A 1-minute read before booking', 'Saya sudah membaca dan': 'I have read and', 'menyetujui aturan reservasi': 'agree to the booking rules',
+    'Centang persetujuan untuk lanjut': 'Tick to agree and continue', 'Lanjut pilih jam': 'Continue to pick a time', 'Lanjut pilih hari': 'Continue to pick a day',
     'Privasimu terjaga.': 'Your privacy is protected.', 'Layar jadwal umum hanya menampilkan nama perusahaan dan jam.': 'Public schedules only show company names and times.',
-    'Jam kosong terdekat': 'Nearest open time', 'Ambil jam ini': 'Take this time', 'Hari ini penuh. Jam kosong terdekat:': 'Today is full. Nearest open time:',
-    'Kosong': 'Open', 'Terisi': 'Booked', 'Tutup sementara': 'Closed', 'Sudah lewat': 'Passed', 'Kapster libur': 'No barber on duty', 'Dipilih': 'Selected',
-    'Hari ini': 'Today', 'Besok': 'Tomorrow', 'Jam dipilih': 'Selected time', 'Belum dipilih': 'Not selected', 'Lanjut isi data': 'Continue', 'Kapster': 'Barber',
+    'Jadwal terdekat yang tersedia': 'Nearest available time', 'Pilih': 'Pick', 'Hari ini sudah penuh. Jadwal terdekat:': 'Fully booked today. Nearest time:',
+    'Tersedia': 'Available', 'Penuh': 'Booked', 'Tidak tersedia': 'Unavailable', 'Sudah lewat': 'Passed', 'Kapster libur': 'No barber on duty', 'Dipilih': 'Selected',
+    'Hari ini': 'Today', 'Besok': 'Tomorrow', 'Jadwal kamu': 'Your slot', 'Belum dipilih': 'Not selected', 'Lanjut': 'Continue', 'Kapster': 'Barber',
     'Bebas (dibagi otomatis)': 'Any (assigned automatically)', 'Kapster favorit (opsional)': 'Preferred barber (optional)', 'Kapster akan menyetujui permintaanmu. Kalau berhalangan, kamu dilayani kapster lain.': 'The barber will confirm your request. If unavailable, another barber will serve you.',
-    'Data pemesan': 'Your details', 'Nama lengkap': 'Full name', 'Perusahaan': 'Company', 'No. ID badge': 'ID badge no.', 'Nomor WhatsApp': 'WhatsApp number', 'Pilih perusahaan': 'Select company',
-    'Kontraktor utama': 'Main contractor', 'Subkontraktor': 'Subcontractor', 'Ingat data saya di HP ini': 'Remember my details on this phone',
-    'Konfirmasi booking': 'Confirm booking', 'Memproses…': 'Processing…', 'Booking berhasil': 'Booking confirmed', 'Kode booking': 'Booking code', 'Simpan kode ini, lalu tunjukkan ke kapster saat kamu datang.': 'Keep this code and show it to the barber when you arrive.',
-    'Jam': 'Time', 'Tanggal': 'Date', 'Atas nama': 'Name', 'Tambah ke Kalender': 'Add to Calendar', 'Batalkan booking': 'Cancel booking', 'Ke menu awal': 'Back to menu', 'Salin kode': 'Copy code',
+    'Isi data kamu': 'Your details', 'Nama lengkap': 'Full name', 'Perusahaan': 'Company', 'No. ID badge': 'ID badge no.', 'Nomor WhatsApp': 'WhatsApp number', 'Pilih perusahaan': 'Select company',
+    'Kontraktor utama': 'Main contractor', 'Subkontraktor': 'Subcontractor', 'Simpan data di HP ini untuk booking berikutnya': 'Save my details on this phone for next time',
+    'Booking sekarang': 'Book now', 'Mengamankan jadwalmu…': 'Securing your slot…', 'Booking berhasil': 'Booking confirmed', 'Kode booking': 'Booking code', 'Tunjukkan kode ini saat datang. Kode juga tersimpan di menu Booking saya.': 'Show this code when you arrive. It is also saved in My bookings.',
+    'Jam': 'Time', 'Tanggal': 'Date', 'Atas nama': 'Name', 'Ingatkan saya': 'Remind me', 'Batalkan booking': 'Cancel booking', 'Kembali ke beranda': 'Back to home', 'Salin kode': 'Copy code',
     'Menunggu persetujuan kapster': 'Waiting for barber confirmation', 'Cari booking': 'Find booking', 'Kode booking (mis. BRB-7Q4K)': 'Booking code (e.g. BRB-7Q4K)', 'Cari': 'Search',
-    'Booking tersimpan di HP ini': 'Bookings saved on this phone', 'Belum ada booking tersimpan.': 'No saved bookings yet.', 'Beri nilai': 'Rate', 'Kirim penilaian': 'Submit rating',
-    'Seberapa puas dengan layanan kapster?': 'How satisfied were you with the barber?', 'Apa yang paling baik?': 'What was best?', 'Apa yang perlu diperbaiki?': 'What needs improvement?', 'Kritik & saran': 'Feedback & suggestions',
-    'Terima kasih!': 'Thank you!', 'Kirim saran': 'Send feedback', 'Kritik & saran umum': 'General feedback', 'Karaoke Room': 'Karaoke Room', 'Perusahaan kamu': 'Your company',
+    'Riwayat booking di HP ini': 'Booking history on this phone', 'Belum ada booking. Yuk, pilih jadwal pertamamu!': 'No bookings yet. Pick your first slot!', 'Beri ulasan': 'Review', 'Kirim ulasan': 'Send review',
+    'Bagaimana layanan kapster hari ini?': 'How was your barber today?', 'Apa yang paling baik?': 'What was best?', 'Apa yang perlu diperbaiki?': 'What needs improvement?', 'Kritik & saran': 'Feedback & suggestions',
+    'Terima kasih!': 'Thank you!', 'Kirim saran': 'Send feedback', 'Kirim masukan': 'Send feedback', 'Karaoke Room': 'Karaoke Room', 'Perusahaan kamu': 'Your company',
     'Jatah perusahaanmu · putaran ini': 'Your company quota · this round', 'perusahaan sudah kebagian': 'companies have had a turn', 'Putaran baru ≤': 'New round by',
-    'Pesan': 'Book', 'Pilih hari yang masih tersedia': 'Pick an available day', 'Jumlah peserta': 'Participants', 'Dipakai': 'Booked by', 'Khusus karyawan': 'Reserved for',
+    'Pesan': 'Book', 'Pilih hari dulu': 'Pick a day first', 'Jumlah peserta': 'Participants', 'Dipakai': 'Booked by', 'Khusus karyawan': 'Reserved for',
     'Sesi kosong H-1 · tanpa potong jatah': 'Open slot (D-1) · no quota used', 'Jatah perusahaanmu sudah terpakai': 'Your company quota is used', 'Hasil potongan': 'Haircut result', 'Tepat waktu': 'On time',
     'Kebersihan alat': 'Tool hygiene', 'Keramahan': 'Friendliness', 'Kerapian tempat': 'Tidiness', 'Satu kode booking = satu penilaian.': 'One booking code = one rating.',
     'Mode offline: menampilkan data terakhir.': 'Offline: showing last saved data.', 'Status': 'Status', 'Batal': 'Cancelled', 'Selesai': 'Done', 'Aktif': 'Active', 'Sedang dilayani': 'In service', 'Tidak datang': 'No-show',
@@ -157,36 +169,66 @@ function menit(s) { const p = String(s).replace(':', '.').split('.'); return (+p
 function jam(x) { return String(Math.floor(x / 60)).padStart(2, '0') + '.' + String(x % 60).padStart(2, '0'); }
 
 /* ---------------- API + offline ---------------- */
-const BACA = { info: 1, jadwalBarber: 1, jadwalKaraoke: 1, papan: 1, daftarPetugas: 1, jadwalKapster: 1, pantau: 1, daftarBooking: 1, rekap: 1, aturJadwal: 1, karaokeKelola: 1, saranTerbaru: 1, pengaturan: 1, riwayatApresiasi: 1 };
+const BACA = { paket: 1, cekBooking: 1, daftarKontraktor: 1, info: 1, jadwalBarber: 1, jadwalKaraoke: 1, papan: 1, daftarPetugas: 1, jadwalKapster: 1, pantau: 1, daftarBooking: 1, rekap: 1, aturJadwal: 1, karaokeKelola: 1, saranTerbaru: 1, pengaturan: 1, riwayatApresiasi: 1 };
 const ANTRE = { mulaiKerja: 1, kembaliIstirahat: 1, keluar: 1, kembaliKeluar: 1, mulaiLayani: 1, selesaiLayani: 1 };
 let offline = false;
-/* ---- penanda loading: bilah atas + hitungan detik bila lama ---- */
-let jmlMuat = 0, mulaiMuat = 0, tMuat = null;
-function muatMulai() {
+/* ---- penanda loading: bilah atas + pesan sesuai aksi + hitungan detik bila lama ---- */
+const LABEL_MUAT = { id: { info: 'Menyiapkan menu', jadwalBarber: 'Mengecek jadwal kapster', jadwalKaraoke: 'Mengecek jadwal Karaoke Room', papan: 'Memuat jadwal hari ini',
+  pesanBarber: 'Mengamankan jam pilihanmu', pesanKaraoke: 'Mengamankan sesi pilihanmu', batalPemesan: 'Membatalkan booking', kirimSurvei: 'Mengirim ulasanmu', login: 'Memeriksa PIN',
+  cekBooking: 'Mengambil booking kamu', paket: 'Mengambil data terbaru', jadwalKapster: 'Memuat jadwal kapster', pantau: 'Memuat status kapster', mulaiLayani: 'Mencatat mulai layanan',
+  selesaiLayani: 'Mencatat layanan selesai', mulaiKerja: 'Mencatat absen', daftarPetugas: 'Memuat daftar petugas' },
+  en: { pesanBarber: 'Securing your time', pesanKaraoke: 'Securing your session', login: 'Checking PIN', kirimSurvei: 'Sending your review' } };
+const PESAN_TUNGGU = { id: ['Menyiapkan halaman', 'Mengambil data terbaru', 'Sebentar lagi siap'], en: ['Preparing page', 'Fetching latest data', 'Almost ready'] };
+let jmlMuat = 0, mulaiMuat = 0, tMuat = null, labelMuat = '';
+function muatMulai(aksi, latar) {
+  if (!latar) labelMuat = (LABEL_MUAT[st.lang] || {})[aksi] || LABEL_MUAT.id[aksi] || '';
   if (jmlMuat++ > 0) return;
   mulaiMuat = Date.now(); document.getElementById('bilah').className = 'on';
   clearInterval(tMuat); tMuat = setInterval(detikMuat, 500);
 }
 function muatSelesai() {
   if (--jmlMuat > 0) return;
-  jmlMuat = 0; clearInterval(tMuat);
+  jmlMuat = 0; clearInterval(tMuat); labelMuat = '';
   const b = document.getElementById('bilah'); b.className = 'selesai'; setTimeout(() => { if (!jmlMuat) b.className = ''; }, 400);
   document.getElementById('pil-muat').hidden = true;
 }
 function detikMuat() {
-  const d = Math.floor((Date.now() - mulaiMuat) / 1000), en = st.lang === 'en', pil = document.getElementById('pil-muat');
-  const teks = d >= 12 ? (en ? `Weak signal, still trying… ${d}s` : `Sinyal lemah, tetap mencoba… ${d} dtk`) : (en ? `Connecting to server… ${d}s` : `Menghubungkan ke server… ${d} dtk`);
-  const di = document.getElementById('muat-dtk');
-  if (di) { pil.hidden = true; if (d >= 2) di.textContent = teks; } // kerangka sudah menampilkan pesan
-  else if (d >= 2) { pil.hidden = false; pil.textContent = teks; }
+  const d = Math.floor((Date.now() - mulaiMuat) / 1000), en = st.lang === 'en', pil = document.getElementById('pil-muat'), di = document.getElementById('muat-dtk');
+  const lemah = d >= 12 ? (en ? 'Weak signal, still trying' : 'Sinyal lemah, tetap kami coba') : '';
+  const dtk = d >= 4 ? ` · ${d} ${en ? 's' : 'dtk'}` : '';
+  if (di) { // kerangka halaman: pesan bergiliran
+    const P = PESAN_TUNGGU[st.lang] || PESAN_TUNGGU.id;
+    di.textContent = (lemah || labelMuat || P[Math.min(P.length - 1, Math.floor(d / 2.5))]) + '…' + dtk; pil.hidden = true; return;
+  }
+  if (!labelMuat || d < 1) return; // pembaruan diam-diam di belakang: cukup bilah tipis di atas
+  pil.hidden = false; pil.innerHTML = `<span class="titik"><i></i><i></i><i></i></span>${esc((lemah || labelMuat) + '…' + dtk)}`;
+}
+/* ---- catatan kecepatan (lihat #/diagnosa) ---- */
+function catatDiag(aksi, total, server, cache) {
+  try { const L = JSON.parse(localStorage.getItem('rf_diag') || '[]'); L.unshift({ a: aksi, t: Math.round(total), s: server == null ? null : server, c: !!cache, w: kiniWit().slice(5, 16) }); localStorage.setItem('rf_diag', JSON.stringify(L.slice(0, 40))); } catch (e) {}
 }
 const BUKAN_TULIS = { cekBooking: 1, login: 1, waPengingat: 1, daftarKontraktor: 1 };
 function bacaSimpanan(k) { try { const x = JSON.parse(localStorage.getItem(k) || 'null'); return x && x.r ? x : null; } catch (e) { return null; } }
 function hapusSimpanan() { try { Object.keys(localStorage).filter(k => k.indexOf('rf_c_') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) {} }
+/** setelah ada perubahan: data publik ditandai "basi" (tetap tampil seketika lalu diperbarui di belakang); data petugas dibuang agar langsung segar */
+const PUBLIK_CEPAT = /^rf_c_(info|jadwalBarber|jadwalKaraoke|papan|daftarPetugas|cekBooking|paket\{"daftar":\[\{"aksi":"cekBooking")/;
+function basikanSimpanan() {
+  try { Object.keys(localStorage).filter(k => k.indexOf('rf_c_') === 0).forEach(k => {
+    if (PUBLIK_CEPAT.test(k)) { const x = bacaSimpanan(k); if (x) { x.t = 0; localStorage.setItem(k, JSON.stringify(x)); } } else localStorage.removeItem(k);
+  }); } catch (e) {}
+}
 async function kirim(aksi, body, opsi) {
-  const ctl = new AbortController(), w = setTimeout(() => ctl.abort(), opsi.batas || 30000);
-  try { const r = await fetch(window.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' }); return await r.json(); }
-  finally { clearTimeout(w); }
+  const ctl = new AbortController(), w = setTimeout(() => ctl.abort(), opsi.batas || 30000), t0 = performance.now();
+  try {
+    const r = await fetch(window.API_URL, { method: 'POST', body: JSON.stringify(body), signal: ctl.signal, redirect: 'follow' }), j = await r.json();
+    catatDiag(aksi, performance.now() - t0, j.ms, j.cache); return j;
+  } finally { clearTimeout(w); }
+}
+/** beberapa data baca dalam SATU perjalanan ke server */
+async function apiPaket(daftar, opsi = {}) {
+  const r = await api('paket', { daftar }, opsi);
+  if (!r.ok) return daftar.map(() => r);
+  return r.data.map(x => x.ok && r.basi ? Object.assign({ basi: true }, x) : x);
 }
 /**
  * opsi.cepat: tampilkan data terakhir yang tersimpan di HP SEKETIKA, lalu perbarui diam-diam dari server.
@@ -204,12 +246,15 @@ async function api(aksi, p = {}, opsi = {}) {
       return lama.r;
     }
   }
-  if (!opsi.diam) muatMulai();
+  if (!opsi.diam) muatMulai(aksi);
   try {
-    const j = await kirim(aksi, body, opsi);
+    // data yang sama sedang diambil (mis. disiapkan di belakang)? tunggu yang itu saja, jangan kirim dua kali
+    let janji = BACA[aksi] && st.terbang[kunci];
+    if (!janji) { janji = kirim(aksi, body, opsi); if (BACA[aksi]) { st.terbang[kunci] = janji; janji.then(() => delete st.terbang[kunci], () => delete st.terbang[kunci]); } }
+    const j = await janji;
     setOffline(false);
     if (j.ok && BACA[aksi]) { try { localStorage.setItem(kunci, JSON.stringify({ t: Date.now(), r: j })); } catch (e) {} }
-    else if (j.ok && !BUKAN_TULIS[aksi]) hapusSimpanan(); // ada perubahan data → jadwal di HP harus diambil ulang
+    else if (j.ok && !BUKAN_TULIS[aksi]) basikanSimpanan(); // ada perubahan data → diperbarui ulang di belakang
     if (!j.ok && j.error && j.error.kode === 'SESI') { st.petugas = null; simpanJ('petugas', null); }
     return j;
   } catch (e) {
@@ -221,7 +266,7 @@ async function api(aksi, p = {}, opsi = {}) {
 }
 async function perbaruiBelakang(aksi, body, kunci, lama) {
   st.segar[kunci] = 1; const hash = location.hash;
-  muatMulai();
+  muatMulai(aksi, true);
   try {
     const j = await kirim(aksi, body, {});
     setOffline(false);
@@ -260,13 +305,14 @@ const IK = {
   gunting: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#9A4F00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg>',
   mik: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0B5A55" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v3"/></svg>',
   bintang: (isi, uk = 22) => `<svg width="${uk}" height="${uk}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.7 6.3.9-4.55 4.43 1.07 6.27L12 17.1l-5.62 3 1.07-6.27L2.9 9.4l6.3-.9z" fill="${isi ? '#F2A93B' : '#fff'}" stroke="${isi ? '#C77D0A' : '#A9B4B1'}" stroke-width="1.3"/></svg>`,
-  cek: '<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5"/></svg>',
+  cek: '<svg class="gambar-cek" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5 10 17 19 7.5"/></svg>',
   gembok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
   gelas: '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9A4F00" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h10l-1 18H8L7 3Z"/><path d="M7.4 9h9.2M12 3l2-2"/></svg>'
 };
 function kepala(judul, sub, ke = '#/') { return `<div class="atas"><div class="baris"><a class="kembali" href="${ke}" aria-label="Kembali">${IK.kembali}</a><div class="kolom" style="gap:1px"><h2>${judul}</h2>${sub ? `<div class="kecil">${sub}</div>` : ''}</div></div></div>`; }
 function tampil(html, lebar) {
-  st.dirender = st.nav; $app.className = lebar ? 'lebar' : '';
+  const anim = st.animasi; st.animasi = false; st.dirender = st.nav; $app.className = (lebar ? 'lebar' : '') + (anim ? ' masuk' : '');
+  if (anim) { clearTimeout(st.tAnim); st.tAnim = setTimeout(() => $app.classList.remove('masuk'), 700); }
   $app.innerHTML = `<div id="offline" class="offline" ${offline ? '' : 'hidden'}>${t('Mode offline: menampilkan data terakhir.')}</div>` + html;
   if (st.gulir != null) { window.scrollTo(0, st.gulir); st.gulir = null; } else window.scrollTo(0, 0);
 }
@@ -275,7 +321,7 @@ function memuat() {
   $app.className = '';
   $app.innerHTML = `<div class="rangka" aria-busy="true"><i style="height:44px;width:44px"></i><i style="height:30px;width:70%"></i><i style="height:16px;width:90%"></i>
     <i style="height:96px"></i><i style="height:96px"></i><i style="height:60px"></i>
-    <div class="kecil" id="muat-dtk" style="text-align:center;margin-top:6px">${st.lang === 'en' ? 'Loading…' : 'Memuat…'}</div></div>`;
+    <div class="kecil baris" style="justify-content:center;margin-top:6px;gap:8px"><span class="titik hijau"><i></i><i></i><i></i></span><span id="muat-dtk">${st.lang === 'en' ? 'Preparing page…' : 'Menyiapkan halaman…'}</span></div></div>`;
 }
 function lembar(html) { tutupLembar(); const l = document.createElement('div'); l.className = 'lapis'; l.id = 'lapis'; l.innerHTML = `<div class="lembar" role="dialog" aria-modal="true">${html}</div>`; l.addEventListener('click', e => { if (e.target === l) tutupLembar(); }); document.body.appendChild(l); const f = l.querySelector('input,select,textarea,button'); if (f) f.focus(); }
 function tutupLembar() { const l = document.getElementById('lapis'); if (l) l.remove(); }
@@ -300,21 +346,21 @@ async function layarMenu() {
         <button data-lang="id" style="border:0;padding:8px 12px;min-height:36px;${st.lang === 'id' ? 'background:#16212B;color:#fff' : 'background:transparent'}">ID</button>
         <button data-lang="en" style="border:0;padding:8px 12px;min-height:36px;${st.lang === 'en' ? 'background:#16212B;color:#fff' : 'background:transparent'}">EN</button></div></div>
     <div class="kolom" style="gap:4px;margin-top:6px"><div class="label">${esc(I.nama)} · ${tgl(I.hariIni)}</div><h1>${t('Mau booking apa?')}</h1>
-      <p class="kecil" style="margin:0;font-size:15px">${t('Pilih layanan, baca aturannya, lalu ambil jam yang masih kosong. Tidak perlu akun.')}</p></div></div>
+      <p class="kecil" style="margin:0;font-size:15px">${t('Booking barbershop & karaoke tanpa antre. Cukup pakai ID badge, tanpa bikin akun.')}</p></div></div>
   <div class="isi">
     <a class="kartu-menu" href="#/aturan/b"><div class="baris" style="gap:14px"><div class="ikon" style="background:#FCE9D2">${IK.gunting}</div>
-      <div class="kolom" style="gap:2px;flex-grow:1"><b style="font-size:19px">Barbershop</b><span class="kecil">${t('Pria & wanita')} · ${(I.layanan || []).length} ${t('pilihan layanan')}</span></div>${IK.maju}</div>
-      <div class="baris" style="flex-wrap:wrap;gap:8px"><span class="chip hijau">${kosong} ${t('jam kosong hari ini')}</span><span class="chip">${t('Bayar non-tunai di kasir')}</span></div></a>
+      <div class="kolom" style="gap:2px;flex-grow:1"><b style="font-size:19px">Barbershop</b><span class="kecil">${st.lang === 'en' ? 'Haircuts for men & women' : 'Potong rambut pria & wanita'} · ${b.buka}–${b.tutup}</span></div>${IK.maju}</div>
+      <div class="baris" style="flex-wrap:wrap;gap:8px">${kosong === 0 ? `<span class="chip amber">${st.lang === 'en' ? 'Full today · check tomorrow' : 'Hari ini penuh · cek besok'}</span>` : `<span class="chip hijau">${kosong} ${st.lang === 'en' ? 'slots left today' : 'jadwal tersedia hari ini'}</span>`}<span class="chip">${t('Bayar QRIS/kartu di kasir')}</span></div></a>
     <a class="kartu-menu" href="#/aturan/k"><div class="baris" style="gap:14px"><div class="ikon" style="background:#DDEFEC">${IK.mik}</div>
       <div class="kolom" style="gap:2px;flex-grow:1"><b style="font-size:19px">Karaoke Room</b><span class="kecil">${t('Gratis')} · ${I.karaoke.buka}–${I.karaoke.selesai} WIT</span></div>${IK.maju}</div>
-      <div class="baris" style="flex-wrap:wrap;gap:8px"><span class="chip hijau">${t('Cek jatah perusahaanmu')}</span></div></a>
+      <div class="baris" style="flex-wrap:wrap;gap:8px"><span class="chip hijau">${t('Cek & pilih jadwalmu')}</span></div></a>
     <a class="kartu-menu" href="#/saya" style="padding:14px 16px"><div class="baris" style="gap:12px"><div class="ikon" style="width:40px;height:40px;background:#FCE9D2">${IK.bintang(true)}</div>
-      <div class="kolom" style="gap:1px;flex-grow:1"><b style="font-size:16px">${t('Booking saya')}</b><span class="kecil">${t('Cek jadwal, batalkan, atau beri nilai & saran')}</span></div>${IK.maju}</div></a>
-    <div class="kartu gelap" style="border:0;border-radius:18px"><div class="label" style="color:var(--amber);margin-bottom:8px">${t('Barbershop tutup sementara')}</div>
+      <div class="kolom" style="gap:1px;flex-grow:1"><b style="font-size:16px">${t('Booking saya')}</b><span class="kecil">${t('Lihat jadwal, batalkan, atau beri ulasan')}</span></div>${IK.maju}</div></a>
+    <div class="kartu gelap" style="border:0;border-radius:18px"><div class="label" style="color:var(--amber);margin-bottom:8px">${t('Jam istirahat kapster')}</div>
       <div class="baris" style="flex-wrap:wrap;gap:14px">${b.istirahat.map((x, i) => `<div class="kolom" style="gap:1px"><b class="num" style="font-size:14px">${x}</b><span class="mini" style="color:#C7D0D6">${esc((b.istirahatNama || [])[i] || t('Makan & ibadah'))}</span></div>`).join('')}
-      <div class="kolom" style="gap:1px"><b class="num" style="font-size:14px">${b.tutup}</b><span class="mini" style="color:#C7D0D6">${t('Tutup')}</span></div></div></div>
-    <div class="dua"><a class="btn putih kcl" href="#/papan">${t('Jadwal hari ini')}</a><a class="btn putih kcl" href="#/saran">${t('Kritik & saran umum')}</a></div>
-    <a href="#/petugas" class="kecil" style="text-align:center;padding:12px">${t('Masuk petugas (Admin / SPV / Kapster)')}</a>
+      <div class="kolom" style="gap:1px"><b class="num" style="font-size:14px">${b.tutup}</b><span class="mini" style="color:#C7D0D6">${st.lang === 'en' ? 'Barbershop closes' : 'Barbershop tutup'}</span></div></div></div>
+    <div class="dua"><a class="btn putih kcl" href="#/papan">${t('Jadwal hari ini')}</a><a class="btn putih kcl" href="#/saran">${t('Kirim masukan')}</a></div>
+    <a href="#/petugas" class="kecil" style="text-align:center;padding:12px">${t('Masuk sebagai petugas')}</a>
   </div>`);
 }
 
@@ -368,13 +414,14 @@ const WARNA = { h: ['#E3F2EF', '#0B5A55'], a: ['#FCE9D2', '#9A4F00'], m: ['#FBE3
 async function layarAturan(jenis) {
   await pastikanInfo();
   const ok = sessionStorage.getItem('setuju_' + jenis) === '1';
+  setTimeout(siapkanDulu, 200); // pemesan dari QR langsung ke halaman ini: siapkan jadwal selagi aturan dibaca
   const g = aturanData(jenis);
-  tampil(`<div class="atas"><div class="baris"><a class="kembali" href="#/" aria-label="Kembali">${IK.kembali}</a><div class="kolom" style="gap:1px"><h2>${t('Aturan reservasi')}</h2><div class="kecil">${t('Baca sebentar sebelum memesan')}</div></div></div>
+  tampil(`<div class="atas"><div class="baris"><a class="kembali" href="#/" aria-label="Kembali">${IK.kembali}</a><div class="kolom" style="gap:1px"><h2>${t('Aturan reservasi')}</h2><div class="kecil">${t('Baca dulu sebelum booking, cuma 1 menit')}</div></div></div>
     <div class="tab" style="grid-template-columns:1fr 1fr"><button class="${jenis === 'b' ? 'on' : ''}" data-go="#/aturan/b">Barbershop</button><button class="${jenis === 'k' ? 'on' : ''}" data-go="#/aturan/k">Karaoke Room</button></div></div>
   <div class="isi" style="gap:14px">${g.map(([judul, isi]) => `<section class="kolom"><span class="label">${esc(judul)}</span><div class="kartu" style="padding:0;overflow:hidden">${isi.map(r => `<div class="atr"><span class="atr-ik" style="background:${WARNA[r.w][0]};color:${WARNA[r.w][1]}">${r.ik}</span><div class="kolom" style="gap:3px;min-width:0"><b>${esc(r.lead)}</b><span>${emph(r.det)}</span></div></div>`).join('')}</div></section>`).join('')}
     <div class="baris kecil" style="align-items:flex-start">${IK.gembok}<span><b style="color:var(--tinta)">${t('Privasimu terjaga.')}</b> ${t('Layar jadwal umum hanya menampilkan nama perusahaan dan jam.')}</span></div></div>
   <div class="bawah"><button class="cek" data-act="setuju" data-j="${jenis}" role="checkbox" aria-checked="${ok}"><span class="kotak ${ok ? 'on' : ''}">✓</span><span>${t('Saya sudah membaca dan')} <b>${t('menyetujui aturan reservasi')}</b>.</span></button>
-    <a class="btn ${ok ? '' : 'abu'}" href="${ok ? (jenis === 'b' ? '#/barber' : '#/karaoke') : '#/aturan/' + jenis}" ${ok ? '' : 'aria-disabled="true"'}>${ok ? t(jenis === 'b' ? 'Lanjut pilih jam' : 'Lanjut pilih hari') : t('Setujui aturan untuk lanjut')}</a></div>`);
+    <a class="btn ${ok ? '' : 'abu'}" href="${ok ? (jenis === 'b' ? '#/barber' : '#/karaoke') : '#/aturan/' + jenis}" ${ok ? '' : 'aria-disabled="true"'}>${ok ? t(jenis === 'b' ? 'Lanjut pilih jam' : 'Lanjut pilih hari') : t('Centang persetujuan untuk lanjut')}</a></div>`);
 }
 
 /* ---- Barbershop: pilih layanan ---- */
@@ -420,8 +467,8 @@ async function layarBarber() {
     const on = sel && sel.jam === s.jam, bisa = bisaSlot(s), mintaSetuju = s.status === 'kosong' && !bisa && W && W.bolehPria;
     const cls = bisa ? (on ? 'slot on' : 'slot') : mintaSetuju ? 'slot' : s.status === 'lewat' || s.status === 'kosong' ? 'slot lewat' : 'slot mati';
     let ket;
-    if (s.status === 'kosong') ket = (on ? t('Dipilih') + ' · s/d ' + s.selesai : t('Kosong') + ' · s/d ' + s.selesai) + (svcW ? ' · ' + (s.wanita ? t('Kapster wanita ✓') : t('Kapster pria')) : '');
-    else ket = s.status === 'terisi' ? t('Terisi') + (s.perusahaan ? ' · ' + esc(s.perusahaan) : '') : s.status === 'tutup' ? t('Tutup sementara') + (s.alasan ? ' · ' + esc(s.alasan) : '') : s.status === 'khusus' ? (en ? 'Reserved: special treatment hours' : 'Dipakai jam khusus treatment') : s.status === 'libur' ? t('Kapster libur') : t('Sudah lewat');
+    if (s.status === 'kosong') ket = (on ? t('Dipilih') + ' · s/d ' + s.selesai : t('Tersedia') + ' · s/d ' + s.selesai) + (svcW ? ' · ' + (s.wanita ? t('Kapster wanita ✓') : t('Kapster pria')) : '');
+    else ket = s.status === 'terisi' ? t('Penuh') + (s.perusahaan ? ' · ' + esc(s.perusahaan) : '') : s.status === 'tutup' ? t('Tidak tersedia') + (s.alasan ? ' · ' + esc(s.alasan) : '') : s.status === 'khusus' ? (en ? 'Reserved: special treatment hours' : 'Dipakai jam khusus treatment') : s.status === 'libur' ? t('Kapster libur') : t('Sudah lewat');
     const act = bisa ? `data-act="pilihJam" data-t="${H.tanggal}" data-j="${s.jam}"` : mintaSetuju ? `data-act="mintaSetuju" data-t="${H.tanggal}" data-j="${s.jam}"` : 'disabled';
     baris.push(`<button class="${cls}" ${act} aria-pressed="${!!on}" ${mintaSetuju ? 'style="border-style:dashed"' : ''}><span class="num" style="font-size:17px;font-weight:800">${s.jam}</span><span style="font-size:13px;opacity:.88;text-align:right">${ket}</span></button>`);
   });
@@ -440,33 +487,33 @@ async function layarBarber() {
       ${W.bolehPria && dekatUmum ? `<button class="btn putih kcl" data-act="setujuPria" data-v="1">${t('Lanjut dengan kapster pria')}${dekatUmum && !dekatUmum.wanita ? ' · ' + relHari(dekatUmum.tanggal) + ' ' + dekatUmum.jam : ''}</button>` : ''}</div>`;
   } else if (dekat) {
     banner = `<div class="antara" style="border-radius:14px;padding:12px 14px;${hariIniPenuh ? 'background:#FCE9D2;color:#4A2800;border:1.5px solid #F2C48B' : 'background:#E3F2EF;color:#0B3D3A;border:1.5px solid #B9DDD6'}">
-      <div class="kolom" style="gap:2px"><span style="font-size:12px;font-weight:700;opacity:.85">${hariIniPenuh ? t('Hari ini penuh. Jam kosong terdekat:') : t('Jam kosong terdekat')}</span><b class="num" style="font-size:15px">${relHari(dekat.tanggal)} · ${dekat.jam}</b></div>
-      <button class="btn kcl" style="width:auto;flex-shrink:0;${hariIniPenuh ? 'background:#16212B' : ''}" data-act="pilihJam" data-t="${dekat.tanggal}" data-j="${dekat.jam}">${t('Ambil jam ini')}</button></div>`;
+      <div class="kolom" style="gap:2px"><span style="font-size:12px;font-weight:700;opacity:.85">${hariIniPenuh ? t('Hari ini sudah penuh. Jadwal terdekat:') : t('Jadwal terdekat yang tersedia')}</span><b class="num" style="font-size:15px">${relHari(dekat.tanggal)} · ${dekat.jam}</b></div>
+      <button class="btn kcl" style="width:auto;flex-shrink:0;${hariIniPenuh ? 'background:#16212B' : ''}" data-act="pilihJam" data-t="${dekat.tanggal}" data-j="${dekat.jam}">${t('Pilih')}</button></div>`;
   } else banner = `<div class="kartu" style="background:#FBE3E0;border-color:#E3B4AF;color:#7A1F16"><b>${en ? 'Fully booked for the next days.' : 'Semua jam sampai ' + (D.hari.length - 1) + ' hari ke depan sudah penuh.'}</b><div class="kecil" style="color:inherit">${en ? 'Please check again tomorrow.' : 'Cek lagi besok, ya. Jadwal baru dibuka setiap hari.'}</div></div>`;
   if (setuju) banner = `<div class="antara kecil" style="background:#DDEBF7;color:#1F4E78;border-radius:12px;padding:8px 12px"><span>✓ ${t('Kamu setuju dilayani kapster pria')}</span><button data-act="setujuPria" data-v="0" style="background:none;border:0;color:inherit;font-weight:700;text-decoration:underline;padding:6px 0">${t('Ubah')}</button></div>` + banner;
   tampil(kepala('Barbershop', sub, '#/barber') + `
   <div class="p kolom" style="gap:12px">${banner}
-    <div class="tab" style="grid-template-columns:repeat(${D.hari.length},minmax(0,1fr))">${D.hari.map(h => `<button class="${h.tanggal === hariAktif ? 'on' : ''}" data-act="hariB" data-t="${h.tanggal}"><span style="display:block">${relHari(h.tanggal)}</span><span class="mini" style="font-weight:600">${h.slot.filter(bisaSlot).length} ${t('Kosong').toLowerCase()}</span></button>`).join('')}</div>
-    <div class="baris mini" style="gap:14px;flex-wrap:wrap"><span class="baris" style="gap:6px"><i style="width:12px;height:12px;border-radius:4px;border:1.5px solid var(--hijau);background:#fff"></i>${t('Kosong')}</span><span class="baris" style="gap:6px"><i style="width:12px;height:12px;border-radius:4px;background:#D9DEDC"></i>${t('Terisi')}</span><span class="baris" style="gap:6px"><i style="width:12px;height:12px;border-radius:4px;background:#F7E3C9"></i>${t('Tutup')}</span></div>
+    <div class="tab" style="grid-template-columns:repeat(${D.hari.length},minmax(0,1fr))">${D.hari.map(h => `<button class="${h.tanggal === hariAktif ? 'on' : ''}" data-act="hariB" data-t="${h.tanggal}"><span style="display:block">${relHari(h.tanggal)}</span><span class="mini" style="font-weight:600">${h.slot.filter(bisaSlot).length} ${t('Tersedia').toLowerCase()}</span></button>`).join('')}</div>
+    <div class="baris mini" style="gap:14px;flex-wrap:wrap"><span class="baris" style="gap:6px"><i style="width:12px;height:12px;border-radius:4px;border:1.5px solid var(--hijau);background:#fff"></i>${t('Tersedia')}</span><span class="baris" style="gap:6px"><i style="width:12px;height:12px;border-radius:4px;background:#D9DEDC"></i>${t('Penuh')}</span><span class="baris" style="gap:6px"><i style="width:12px;height:12px;border-radius:4px;background:#F7E3C9"></i>${t('Tutup')}</span></div>
   </div>
   <div class="isi" style="gap:8px">${baris.join('') || `<div class="kecil">${en ? 'No time fits this service on this day.' : 'Tidak ada jam yang cukup untuk layanan ini di hari tersebut.'}</div>`}</div>
   <div class="bawah">
     ${kapPilih ? `<div class="fld"><label for="fav">${t('Kapster favorit (opsional)')}</label><select id="fav" class="inp"><option value="">${t('Bebas (dibagi otomatis)')}</option>${kapList.map(k => `<option value="${k.id}" ${sel.fav === k.id ? 'selected' : ''}>${esc(k.nama)}</option>`).join('')}</select><span class="mini">${t('Kapster akan menyetujui permintaanmu. Kalau berhalangan, kamu dilayani kapster lain.')}</span></div>` : ''}
-    <div class="antara" style="font-size:14px"><span class="kecil">${t('Jam dipilih')}</span><b class="num">${sel ? relHari(sel.tanggal) + ' · ' + sel.jam + '–' + slotSel.selesai : t('Belum dipilih')}</b></div>
-    <button class="btn" data-act="keFormB" ${sel ? '' : 'disabled'}>${t('Lanjut isi data')}</button></div>`);
+    <div class="antara" style="font-size:14px"><span class="kecil">${t('Jadwal kamu')}</span><b class="num">${sel ? relHari(sel.tanggal) + ' · ' + sel.jam + '–' + slotSel.selesai : t('Belum dipilih')}</b></div>
+    <button class="btn" data-act="keFormB" ${sel ? '' : 'disabled'}>${t('Lanjut')}</button></div>`);
 }
 function gambarKhusus(D, sub, ganti) {
   const en = st.lang === 'en', sel = pilihan.b && D.khusus.some(x => x.tanggal === pilihan.b.tanggal && x.jam === pilihan.b.jam && x.status === 'kosong') ? pilihan.b : null;
   const rows = D.khusus.map(x => {
     const bisa = x.status === 'kosong', on = bisa && sel && sel.tanggal === x.tanggal && sel.jam === x.jam;
-    const ket = (bisa ? (on ? t('Dipilih') : t('Kosong')) : x.status === 'terisi' ? t('Terisi') : x.status === 'lewat' ? t('Sudah lewat') : x.status === 'libur' ? t('Kapster libur') : t('Tutup')) + ' · ' + t('Kapster') + ' ' + esc(x.kapster);
+    const ket = (bisa ? (on ? t('Dipilih') : t('Tersedia')) : x.status === 'terisi' ? t('Penuh') : x.status === 'lewat' ? t('Sudah lewat') : x.status === 'libur' ? t('Kapster libur') : t('Tutup')) + ' · ' + t('Kapster') + ' ' + esc(x.kapster);
     return `<button class="${bisa ? (on ? 'slot on' : 'slot') : x.status === 'lewat' ? 'slot lewat' : 'slot mati'}" ${bisa ? `data-act="pilihJam" data-t="${x.tanggal}" data-j="${x.jam}"` : 'disabled'} aria-pressed="${!!on}"><span class="kolom" style="gap:2px;text-align:left"><b style="font-size:15px">${tgl(x.tanggal)} · <span class="num">${x.jam}–${x.selesai}</span></b><span style="font-size:13px;opacity:.88">${ket}</span></span><b style="font-size:12px">${on ? t('Dipilih').toUpperCase() : bisa ? (en ? 'TAKE' : 'AMBIL') : '—'}</b></button>`;
   }).join('');
   tampil(kepala('Barbershop', sub, '#/barber') + `<div class="isi" style="gap:8px">
     <div class="kartu" style="background:#FCE9D2;border:0;color:#4A2800;font-size:14px;line-height:1.45">${en ? 'Full treatment takes longer, so it is only available in special hours opened by the SPV with the female barber.' : 'Full treatment butuh waktu lebih lama, jadi hanya tersedia di <b>jam khusus</b> yang dibuka SPV bersama kapster wanita.'}</div>
     ${rows || `<div class="kartu kolom" style="gap:4px"><b>${en ? 'No special hours open yet' : 'Belum ada jam khusus yang dibuka'}</b><span class="kecil">${en ? 'Please check again later or ask the SPV on site.' : 'Cek lagi nanti, atau tanyakan jadwalnya ke SPV di lokasi.'}</span></div>`}
     <div style="align-self:flex-start;margin-top:6px">${ganti}</div></div>
-  <div class="bawah"><div class="antara" style="font-size:14px"><span class="kecil">${t('Jam dipilih')}</span><b class="num">${sel ? relHari(sel.tanggal) + ' · ' + sel.jam : t('Belum dipilih')}</b></div><button class="btn" data-act="keFormB" ${sel ? '' : 'disabled'}>${t('Lanjut isi data')}</button></div>`);
+  <div class="bawah"><div class="antara" style="font-size:14px"><span class="kecil">${t('Jadwal kamu')}</span><b class="num">${sel ? relHari(sel.tanggal) + ' · ' + sel.jam : t('Belum dipilih')}</b></div><button class="btn" data-act="keFormB" ${sel ? '' : 'disabled'}>${t('Lanjut')}</button></div>`);
 }
 
 /** pilihan perusahaan: kontraktor utama, lalu subkontraktor (termasuk KSO GDSK-PID sebagai pengelola layanan di bawah JGC) */
@@ -483,7 +530,7 @@ function formPemesan(perluPeserta) {
     <div class="dua"><div class="fld"><label for="f-id">${t('No. ID badge')}</label><input id="f-id" class="inp" autocapitalize="characters" maxlength="20" value="${esc(d.id || '')}"></div>
       <div class="fld"><label for="f-wa">${t('Nomor WhatsApp')}</label><input id="f-wa" class="inp" inputmode="tel" maxlength="16" placeholder="08xx" value="${esc(d.wa || '')}"></div></div>
     ${perluPeserta ? `<div class="fld"><label for="f-ps">${t('Jumlah peserta')} (1–${I.karaoke.kapasitas})</label><input id="f-ps" class="inp" type="number" inputmode="numeric" min="1" max="${I.karaoke.kapasitas}" value="${esc(d.ps || '')}"></div>` : ''}
-    <button class="cek" data-act="ingat" role="checkbox" aria-checked="${d.ingat !== false}"><span class="kotak ${d.ingat !== false ? 'on' : ''}">✓</span><span>${t('Ingat data saya di HP ini')}</span></button>`;
+    <button class="cek" data-act="ingat" role="checkbox" aria-checked="${d.ingat !== false}"><span class="kotak ${d.ingat !== false ? 'on' : ''}">✓</span><span>${t('Simpan data di HP ini untuk booking berikutnya')}</span></button>`;
 }
 function ambilForm(perluPeserta) {
   const v = id => (document.getElementById(id) || {}).value || '';
@@ -498,29 +545,30 @@ async function layarFormBarber() {
   const sel = pilihan.b; if (!sel) return go('#/barber');
   await pastikanInfo(); const b = st.info.barber;
   const lay = simpanJ('layanan') || {};
-  tampil(kepala(t('Data pemesan'), esc(lay.nama || 'Barbershop') + ' · ' + relHari(sel.tanggal) + ' · ' + sel.jam, '#/barber/jam') + `
+  tampil(kepala(t('Isi data kamu'), esc(lay.nama || 'Barbershop') + ' · ' + relHari(sel.tanggal) + ' · ' + sel.jam, '#/barber/jam') + `
   <div class="isi">${formPemesan(false)}
     <div class="kartu" style="background:#FCE9D2;border:0;color:#4A2800;font-size:14px;line-height:1.45">${emph(st.lang === 'en' ? `Arrive by ${jam(menit(sel.jam) + b.toleransi)}. More than ${b.toleransi} minutes late = auto-cancelled. Pay cashless (QRIS/card) at the cashier before your cut.` : `Datang paling lambat pukul ${jam(menit(sel.jam) + b.toleransi)}. Telat lebih dari ${b.toleransi} menit = booking batal otomatis. Bayar non-tunai (QRIS/kartu) di kasir sebelum dicukur.`)}</div></div>
   ${lay.untuk === 'Wanita' && st.setujuPria ? `<div class="kecil" style="padding:0 20px 10px;color:#1F4E78">✓ ${t('Kamu setuju dilayani kapster pria')}</div>` : ''}
-  <div class="bawah"><button class="btn" data-act="kirimB">${t('Konfirmasi booking')}</button></div>`);
+  <div class="bawah"><button class="btn" data-act="kirimB">${t('Booking sekarang')}</button></div>`);
 }
 function simpanKode(b, idb) { const L = simpanJ('kode') || []; if (!L.some(x => x.kode === b.kode)) L.unshift({ kode: b.kode, id: idb, layanan: b.layanan, tanggal: b.tanggal, jam: b.jam }); simpanJ('kode', L.slice(0, 20)); }
 
 async function layarSukses(kode) {
   const L = simpanJ('kode') || [], x = L.find(k => k.kode === kode); if (!x) return go('#/saya');
-  const r = await api('cekBooking', { kode, id_badge: x.id }); if (!r.ok) return layarGalat(r);
+  // data booking sudah dikirim server saat Konfirmasi — tidak perlu bertanya lagi
+  const r = st.bookingBaru && st.bookingBaru.kode === kode ? { ok: true, data: st.bookingBaru } : await api('cekBooking', { kode, id_badge: x.id }, { cepat: true }); if (!r.ok) return layarGalat(r);
   const b = r.data, I = st.info || await pastikanInfo();
   const fav = b.status === 'MENUNGGU_FAV';
   tampil(`<div class="isi" style="padding-top:34px;gap:16px">
     <div class="kolom" style="align-items:center;text-align:center;gap:12px"><div style="width:84px;height:84px;border-radius:999px;background:var(--hijau);display:flex;align-items:center;justify-content:center;animation:pop .42s ease-out both">${IK.cek}</div>
-      <h1 style="font-size:28px">${t('Booking berhasil')}</h1><p class="kecil" style="margin:0;font-size:15px">${t('Simpan kode ini, lalu tunjukkan ke kapster saat kamu datang.')}</p></div>
+      <h1 style="font-size:28px">${t('Booking berhasil')}</h1><p class="kecil" style="margin:0;font-size:15px">${t('Tunjukkan kode ini saat datang. Kode juga tersimpan di menu Booking saya.')}</p></div>
     ${kartuBooking(b)}
     ${fav ? `<div class="kartu" style="background:#DDEBF7;border:0;color:#1F4E78;font-size:14px"><b>${t('Menunggu persetujuan kapster')}</b><div class="kecil" style="color:inherit">${st.lang === 'en' ? 'If the barber is unavailable, another barber on duty will serve you.' : 'Kalau kapster favoritmu berhalangan, kamu otomatis dilayani kapster lain yang bertugas.'}</div></div>` : ''}
     <div class="kartu" style="background:#FCE9D2;border:0;color:#4A2800;font-size:14px;line-height:1.45">${emph(b.layanan === 'BARBER' ? (st.lang === 'en' ? `Arrive by ${b.batasDatang}. Pay cashless at the cashier and show the receipt to the barber.` : `Datang paling lambat pukul ${b.batasDatang}, ya. Bayar non-tunai di kasir, lalu tunjukkan struk ke kapster. Sudah rapi? Beri nilai lewat menu Booking Saya.`) :
       (st.lang === 'en' ? `Arrive by ${b.batasDatang}. Get the key from the SPV or staff on site. Stop by ${I.karaoke.snackTempat} before ${I.karaoke.snackTutup} for snacks!` : `Datang paling lambat pukul ${b.batasDatang}. Ambil kunci di SPV atau petugas di lokasi. Biar makin seru, mampir dulu ke ${I.karaoke.snackTempat} sebelum pukul ${I.karaoke.snackTutup}!`))}</div>
   </div>
-  <div class="bawah"><a class="btn hitam" href="${kalenderUrl(b)}" target="_blank" rel="noopener">${t('Tambah ke Kalender')} · ${st.lang === 'en' ? 'reminder' : 'ingatkan'} ${I.pengingatMenit} ${st.lang === 'en' ? 'min' : 'mnt'}</a>
-    <div class="dua"><button class="btn putih kcl" data-act="salin" data-k="${b.kode}">${t('Salin kode')}</button><a class="btn putih kcl" href="#/">${t('Ke menu awal')}</a></div></div>`);
+  <div class="bawah"><a class="btn hitam" href="${kalenderUrl(b)}" target="_blank" rel="noopener">${t('Ingatkan saya')} · ${I.pengingatMenit} ${st.lang === 'en' ? 'min before' : 'menit sebelumnya'}</a>
+    <div class="dua"><button class="btn putih kcl" data-act="salin" data-k="${b.kode}">${t('Salin kode')}</button><a class="btn putih kcl" href="#/">${t('Kembali ke beranda')}</a></div></div>`);
 }
 function kartuBooking(b) {
   const nm = { AKTIF: t('Aktif'), MENUNGGU_FAV: t('Menunggu persetujuan kapster'), BERLANGSUNG: t('Sedang dilayani'), HADIR: t('Sedang dilayani'), SELESAI: t('Selesai'), TIDAK_DATANG: t('Tidak datang'), BATAL_PEMESAN: t('Batal'), BATAL_SISTEM: t('Batal'), BATAL_SPV: t('Batal') }[b.status] || b.status;
@@ -548,40 +596,48 @@ function kalenderUrl(b) {
 async function layarSaya(kodeAktif) {
   await pastikanInfo();
   const L = simpanJ('kode') || [];
-  const hasil = await Promise.all(L.slice(0, 8).map(x => api('cekBooking', { kode: x.kode, id_badge: x.id }).then(r => r.ok ? r.data : null)));
+  const daftar = L.slice(0, 8).map(x => ({ aksi: 'cekBooking', kode: x.kode, id_badge: x.id })), kunci = 'rf_c_paket' + JSON.stringify({ daftar });
+  const kenal = [].concat(st.bookingBaru ? [st.bookingBaru] : [], st.bookingSaya || []);
+  let hasil;
+  if (L.length && !bacaSimpanan(kunci) && kenal.length && L.slice(0, 8).every(x => kenal.some(b => b.kode === x.kode))) {
+    // semua booking sudah dikenal di HP: tampil seketika, status terbaru menyusul dari server
+    hasil = L.slice(0, 8).map(x => kenal.find(b => b.kode === x.kode));
+    if (!st.segar[kunci]) perbaruiBelakang('paket', { aksi: 'paket', bahasa: st.lang, daftar }, kunci, { r: { data: [] } });
+  } else hasil = L.length ? (await apiPaket(daftar, { cepat: true })).map(r => r.ok ? r.data : null) : [];
+  st.bookingSaya = hasil.filter(Boolean);
   const aktif = kodeAktif ? hasil.find(b => b && b.kode === kodeAktif) : null;
-  tampil(kepala(t('Booking saya'), t('Cek jadwal, batalkan, atau beri nilai & saran')) + `<div class="isi">
+  tampil(kepala(t('Booking saya'), t('Lihat jadwal, batalkan, atau beri ulasan')) + `<div class="isi">
     ${aktif ? kartuBooking(aktif) + aksiBooking(aktif) : ''}
-    <section class="kolom"><span class="label">${t('Booking tersimpan di HP ini')}</span>
-      ${hasil.filter(Boolean).length ? hasil.filter(Boolean).map(b => `<a class="kartu antara" style="text-decoration:none" href="#/saya/${b.kode}"><div class="kolom" style="gap:2px"><b class="num">${b.kode} · ${b.layanan === 'BARBER' ? 'Barbershop' : 'Karaoke'}</b><span class="kecil">${tgl(b.tanggal, true)} · ${b.jam}</span></div><span class="chip ${b.status.indexOf('BATAL') === 0 ? 'merah' : b.bisaNilai ? 'amber' : 'hijau'}">${b.bisaNilai ? t('Beri nilai') : esc({ AKTIF: t('Aktif'), SELESAI: t('Selesai'), MENUNGGU_FAV: t('Menunggu persetujuan kapster'), BERLANGSUNG: t('Sedang dilayani'), HADIR: t('Sedang dilayani'), TIDAK_DATANG: t('Tidak datang') }[b.status] || t('Batal'))}</span></a>`).join('') : `<div class="kecil">${t('Belum ada booking tersimpan.')}</div>`}</section>
+    <section class="kolom"><span class="label">${t('Riwayat booking di HP ini')}</span>
+      ${hasil.filter(Boolean).length ? hasil.filter(Boolean).map(b => `<a class="kartu antara" style="text-decoration:none" href="#/saya/${b.kode}"><div class="kolom" style="gap:2px"><b class="num">${b.kode} · ${b.layanan === 'BARBER' ? 'Barbershop' : 'Karaoke'}</b><span class="kecil">${tgl(b.tanggal, true)} · ${b.jam}</span></div><span class="chip ${b.status.indexOf('BATAL') === 0 ? 'merah' : b.bisaNilai ? 'amber' : 'hijau'}">${b.bisaNilai ? t('Beri ulasan') : esc({ AKTIF: t('Aktif'), SELESAI: t('Selesai'), MENUNGGU_FAV: t('Menunggu persetujuan kapster'), BERLANGSUNG: t('Sedang dilayani'), HADIR: t('Sedang dilayani'), TIDAK_DATANG: t('Tidak datang') }[b.status] || t('Batal'))}</span></a>`).join('') : `<div class="kecil">${t('Belum ada booking. Yuk, pilih jadwal pertamamu!')}</div>`}</section>
     <section class="kartu kolom"><b>${t('Cari booking')}</b><input id="c-kode" class="inp" placeholder="${t('Kode booking (mis. BRB-7Q4K)')}" autocapitalize="characters" maxlength="12"><input id="c-id" class="inp" placeholder="${t('No. ID badge')}" autocapitalize="characters" maxlength="20"><button class="btn kcl" data-act="cari">${t('Cari')}</button></section>
   </div>`);
 }
 function aksiBooking(b) {
-  return `<div class="kolom">${b.bisaNilai ? `<a class="btn" href="#/nilai/${b.kode}">${t('Beri nilai')}</a>` : ''}
-    ${b.bisaBatal ? `<div class="dua"><a class="btn putih kcl" href="${kalenderUrl(b)}" target="_blank" rel="noopener">${t('Tambah ke Kalender')}</a><button class="btn merah kcl" data-act="batal" data-k="${b.kode}">${t('Batalkan booking')}</button></div>` : ''}
+  return `<div class="kolom">${b.bisaNilai ? `<a class="btn" href="#/nilai/${b.kode}">${t('Beri ulasan')}</a>` : ''}
+    ${b.bisaBatal ? `<div class="dua"><a class="btn putih kcl" href="${kalenderUrl(b)}" target="_blank" rel="noopener">${t('Ingatkan saya')}</a><button class="btn merah kcl" data-act="batal" data-k="${b.kode}">${t('Batalkan booking')}</button></div>` : ''}
     ${b.sudahNilai ? `<div class="kecil" style="text-align:center">${t('Terima kasih!')} ✓</div>` : ''}</div>`;
 }
 async function layarNilai(kode) {
   const L = simpanJ('kode') || [], x = L.find(k => k.kode === kode); if (!x) return go('#/saya');
-  const r = await api('cekBooking', { kode, id_badge: x.id }); if (!r.ok) return layarGalat(r);
+  const r = await api('cekBooking', { kode, id_badge: x.id }, { cepat: true }); if (!r.ok) return layarGalat(r);
   if (!r.data.bisaNilai) return go('#/saya/' + kode);
   st.nilai = st.nilai && st.nilai.kode === kode ? st.nilai : { kode, n: 0, aspek: [] };
-  gambarNilai(r.data);
+  st.nilaiB = r.data; gambarNilai(r.data);
 }
 function gambarNilai(b) {
   const N = st.nilai, baik = N.n >= 4, lbl = st.lang === 'en' ? ['Tap a star', 'Very poor', 'Poor', 'Okay', 'Good', 'Excellent'] : ['Pilih bintang', 'Sangat kecewa', 'Kecewa', 'Biasa saja', 'Puas', 'Sangat puas'];
   const aspek = ['Hasil potongan', 'Tepat waktu', 'Kebersihan alat', 'Keramahan', 'Kerapian tempat'];
   tampil(kepala(t('Booking saya'), esc(b.kode) + ' · ' + esc(b.kapster), '#/saya/' + b.kode) + `<div class="isi" style="gap:16px">
-    <div class="kolom" style="align-items:center;text-align:center"><b style="font-size:16px">${t('Seberapa puas dengan layanan kapster?')}</b>
+    <div class="kolom" style="align-items:center;text-align:center"><b style="font-size:16px">${t('Bagaimana layanan kapster hari ini?')}</b>
       <div class="baris" role="radiogroup" style="gap:4px">${[1, 2, 3, 4, 5].map(i => `<button role="radio" aria-checked="${i === N.n}" aria-label="${i}" data-act="bintang" data-n="${i}" style="background:none;border:0;padding:4px;min-width:48px;min-height:48px">${IK.bintang(i <= N.n, 34)}</button>`).join('')}</div>
       <span class="chip ${N.n === 0 ? '' : baik ? 'hijau' : 'merah'}">${lbl[N.n]}</span></div>
     <div class="kolom"><b>${t(baik || !N.n ? 'Apa yang paling baik?' : 'Apa yang perlu diperbaiki?')}</b><div class="baris" style="flex-wrap:wrap;gap:8px">${aspek.map(a => { const on = N.aspek.includes(a); return `<button data-act="aspek" data-a="${a}" aria-pressed="${on}" style="border-radius:999px;padding:10px 14px;min-height:44px;font-weight:700;font-size:14px;${on ? (baik ? 'background:#0B6B65;color:#fff;border:1.5px solid #0B6B65' : 'background:#C0392B;color:#fff;border:1.5px solid #C0392B') : 'background:#fff;border:1.5px solid #C9D1CF'}">${t(a)}</button>`; }).join('')}</div></div>
     <div class="fld"><label for="n-saran">${t('Kritik & saran')}</label><textarea id="n-saran" class="inp" rows="4" maxlength="600" style="resize:none">${esc(N.saran || '')}</textarea><span class="mini">${st.lang === 'en' ? 'The barber only sees the average rating and comments, without your name.' : 'Kapster hanya melihat rata-rata nilai dan isi saran, tanpa nama penilai.'}</span></div></div>
-  <div class="bawah"><button class="btn" data-act="kirimNilai" ${N.n ? '' : 'disabled'}>${t('Kirim penilaian')}</button><span class="mini" style="text-align:center">${t('Satu kode booking = satu penilaian.')}</span></div>`);
+  <div class="bawah"><button class="btn" data-act="kirimNilai" ${N.n ? '' : 'disabled'}>${t('Kirim ulasan')}</button><span class="mini" style="text-align:center">${t('Satu kode booking = satu penilaian.')}</span></div>`);
 }
 function layarSaran() {
-  tampil(kepala(t('Kritik & saran umum'), st.lang === 'en' ? 'For suggestions about the facility or the app' : 'Untuk masukan tentang fasilitas atau aplikasi') + `<div class="isi">
+  tampil(kepala(t('Kirim masukan'), st.lang === 'en' ? 'For suggestions about the facility or the app' : 'Untuk masukan tentang fasilitas atau aplikasi') + `<div class="isi">
     <div class="fld"><label for="s-nama">${t('Nama lengkap')} (${st.lang === 'en' ? 'optional' : 'opsional'})</label><input id="s-nama" class="inp" maxlength="60"></div>
     <div class="fld"><label for="s-isi">${t('Kritik & saran')}</label><textarea id="s-isi" class="inp" rows="6" maxlength="600" style="resize:none"></textarea></div></div>
   <div class="bawah"><button class="btn" data-act="kirimSaran">${t('Kirim saran')}</button></div>`);
@@ -601,7 +657,7 @@ async function layarKaraoke() {
     let bisa = h.status === 'kosong' && pid && (h.jenis === 'pemilik' ? pemilik : (h.bonus || (!pemilik && !habis)));
     const on = bisa && sel === h.tanggal;
     let ket = h.status === 'terisi' ? t('Dipakai') + ' ' + esc(h.perusahaan) : h.status === 'tutup' ? t('Tutup') + (h.alasan ? ' · ' + esc(h.alasan) : '') : h.status === 'lewat' ? t('Sudah lewat') :
-      h.jenis === 'pemilik' ? t('Khusus karyawan') + ' ' + esc(I.pemilik) : h.bonus ? t('Sesi kosong H-1 · tanpa potong jatah') : (habis ? t('Jatah perusahaanmu sudah terpakai') : t('Kosong'));
+      h.jenis === 'pemilik' ? t('Khusus karyawan') + ' ' + esc(I.pemilik) : h.bonus ? t('Sesi kosong H-1 · tanpa potong jatah') : (habis ? t('Jatah perusahaanmu sudah terpakai') : t('Tersedia'));
     const cls = on ? 'slot on' : bisa ? 'slot' : (h.status === 'kosong' ? 'slot lewat' : 'slot mati');
     return `<button class="${cls}" ${bisa ? `data-act="pilihK" data-t="${h.tanggal}"` : 'disabled'} aria-pressed="${on}"><span class="kolom" style="gap:2px"><b style="font-size:15px">${tgl(h.tanggal)}</b><span style="font-size:13px;opacity:.88">${ket}</span></span><b style="font-size:12px">${on ? t('Dipilih').toUpperCase() : bisa ? (st.lang === 'en' ? 'TAKE' : 'AMBIL') : '—'}</b></button>`;
   }).join('');
@@ -617,14 +673,14 @@ async function layarKaraoke() {
   </div>
   <div class="isi" style="gap:8px"><span class="label">${st.lang === 'en' ? 'Next 2 weeks' : '2 minggu ke depan'} · ${I.karaoke.buka}–${I.karaoke.selesai}</span>${hari}</div>
   <div class="bawah"><div class="baris" style="background:#FCE9D2;border-radius:14px;padding:9px 12px;gap:12px">${IK.gelas}<div class="kolom" style="gap:1px;font-size:13px;color:#4A2800"><b style="font-size:14px">${t('Biar makin seru!')}</b><span>${st.lang === 'en' ? `Stop by ${esc(I.karaoke.snackTempat)} before ${I.karaoke.snackTutup}. Snacks & drinks welcome inside.` : `Mampir dulu ke ${esc(I.karaoke.snackTempat)} sebelum ${I.karaoke.snackTutup}. Snack & minuman boleh dibawa masuk.`}</span></div></div>
-    <button class="btn" data-act="keFormK" ${sel ? '' : 'disabled'}>${sel ? t('Pesan') + ' ' + tgl(sel, true) + ' · ' + I.karaoke.buka + '–' + I.karaoke.selesai : t('Pilih hari yang masih tersedia')}</button></div>`);
+    <button class="btn" data-act="keFormK" ${sel ? '' : 'disabled'}>${sel ? t('Pesan') + ' ' + tgl(sel, true) + ' · ' + I.karaoke.buka + '–' + I.karaoke.selesai : t('Pilih hari dulu')}</button></div>`);
 }
 async function layarFormKaraoke() {
   if (!pilihan.k) return go('#/karaoke');
   await pastikanInfo();
   const d = simpanJ('pemesan') || {}; if (st.ptK) { d.pt = st.ptK; simpanJ('pemesan', d); }
-  tampil(kepala(t('Data pemesan'), 'Karaoke Room · ' + tgl(pilihan.k) + ' · ' + st.info.karaoke.buka, '#/karaoke') + `<div class="isi">${formPemesan(true)}</div>
-  <div class="bawah"><button class="btn" data-act="kirimK">${t('Konfirmasi booking')}</button></div>`);
+  tampil(kepala(t('Isi data kamu'), 'Karaoke Room · ' + tgl(pilihan.k) + ' · ' + st.info.karaoke.buka, '#/karaoke') + `<div class="isi">${formPemesan(true)}</div>
+  <div class="bawah"><button class="btn" data-act="kirimK">${t('Booking sekarang')}</button></div>`);
 }
 
 /* ---- Papan jadwal ---- */
@@ -632,8 +688,8 @@ async function layarPapan() {
   const r = await api('papan', {}, { cepat: true }); if (!r.ok) return layarGalat(r);
   const D = r.data;
   tampil(kepala(t('Jadwal hari ini'), tgl(D.tanggal) + ' · ' + D.jam + ' WIT') + `<div class="isi">
-    <section class="kolom"><span class="label">Barbershop</span><div class="kartu" style="padding:6px 14px">${D.barber.map(s => `<div class="antara" style="padding:9px 0;border-bottom:1px solid #EEF1EF"><b class="num">${s.jam}</b><span class="${s.status === 'kosong' ? 'chip hijau' : s.status === 'terisi' ? '' : 'mini'}" style="font-weight:700">${s.status === 'terisi' ? esc(s.perusahaan) : s.status === 'kosong' ? t('Kosong') : s.status === 'lewat' ? t('Sudah lewat') : t('Tutup')}</span></div>`).join('')}</div></section>
-    <section class="kolom"><span class="label">Karaoke Room · ${D.karaokeJam}</span><div class="kartu" style="padding:6px 14px">${D.karaoke.map(h => `<div class="antara" style="padding:9px 0;border-bottom:1px solid #EEF1EF"><b>${tgl(h.tanggal, true)}</b><span style="font-weight:700">${h.status === 'terisi' ? esc(h.perusahaan) : h.jenis === 'pemilik' ? 'GDSK-PID' : h.status === 'kosong' ? t('Kosong') : t('Tutup')}</span></div>`).join('')}</div></section>
+    <section class="kolom"><span class="label">Barbershop</span><div class="kartu" style="padding:6px 14px">${D.barber.map(s => `<div class="antara" style="padding:9px 0;border-bottom:1px solid #EEF1EF"><b class="num">${s.jam}</b><span class="${s.status === 'kosong' ? 'chip hijau' : s.status === 'terisi' ? '' : 'mini'}" style="font-weight:700">${s.status === 'terisi' ? esc(s.perusahaan) : s.status === 'kosong' ? t('Tersedia') : s.status === 'lewat' ? t('Sudah lewat') : t('Tutup')}</span></div>`).join('')}</div></section>
+    <section class="kolom"><span class="label">Karaoke Room · ${D.karaokeJam}</span><div class="kartu" style="padding:6px 14px">${D.karaoke.map(h => `<div class="antara" style="padding:9px 0;border-bottom:1px solid #EEF1EF"><b>${tgl(h.tanggal, true)}</b><span style="font-weight:700">${h.status === 'terisi' ? esc(h.perusahaan) : h.jenis === 'pemilik' ? 'GDSK-PID' : h.status === 'kosong' ? t('Tersedia') : t('Tutup')}</span></div>`).join('')}</div></section>
   </div>`);
   clearTimeout(st.tPapan); st.tPapan = setTimeout(() => { if (location.hash === '#/papan') layarPapan(); }, 60000);
 }
@@ -660,7 +716,7 @@ function perluLogin(peran) { if (!st.petugas) { go('#/petugas'); return true; } 
 function keluarAkun() { st.petugas = null; simpanJ('petugas', null); hapusSimpanan(); go('#/petugas'); }
 /** ambil diam-diam data layar berikutnya yang paling mungkin dibuka, supaya terbuka seketika */
 function siapkanDulu() {
-  if (!navigator.onLine || st.disiapkan && Date.now() - st.disiapkan < 60000) return; st.disiapkan = Date.now();
+  if (!navigator.onLine) return; // tiap data hanya diambil bila belum ada / sudah lebih dari 1 menit / basi setelah booking
   const lay = simpanJ('layanan'), pt = (simpanJ('pemesan') || {}).pt;
   const tugas = [['jadwalBarber', { layanan_id: (lay && lay.id) || 'PL' }], ['jadwalKaraoke', pt ? { perusahaan_id: pt } : {}]];
   tugas.forEach(([a, p]) => { const k = 'rf_c_' + a + JSON.stringify(p), x = bacaSimpanan(k); if (!x || Date.now() - x.t > 60000) api(a, p, { diam: true }); });
@@ -668,7 +724,7 @@ function siapkanDulu() {
 
 async function layarKapster() {
   if (perluLogin(['KAPSTER', 'SPV', 'ADMIN'])) return;
-  const r = await api('jadwalKapster', {}); if (!r.ok) return r.error.kode === 'SESI' ? go('#/petugas') : layarGalat(r);
+  const r = await api('jadwalKapster', {}, { cepat: true }); if (!r.ok) return r.error.kode === 'SESI' ? go('#/petugas') : layarGalat(r);
   const D = r.data, u = st.petugas.petugas, kini = menit(kiniWit().slice(11, 16).replace(':', '.'));
   const milik = D.booking.filter(b => b.kapster_id === u.id);
   const berlangsung = milik.find(b => b.status === 'BERLANGSUNG');
@@ -721,7 +777,7 @@ async function layarKapster() {
 }
 async function layarSemua() {
   if (perluLogin(['KAPSTER', 'SPV', 'ADMIN'])) return;
-  const r = await api('jadwalKapster', { semua: true }); if (!r.ok) return layarGalat(r);
+  const r = await api('jadwalKapster', { semua: true }, { cepat: true }); if (!r.ok) return layarGalat(r);
   const D = r.data, u = st.petugas.petugas;
   tampil(`<div class="gelap" style="padding:18px 20px 14px;display:flex;flex-direction:column;gap:12px"><div class="baris"><a class="kembali" href="#/kapster" style="background:var(--gelap);border-color:var(--gelap2);color:#fff">${IK.kembali}</a><div class="kolom" style="gap:2px"><span class="label" style="color:var(--amber)">Semua booking hari ini · ${D.beban.length} kapster</span><b>Masuk sebagai ${esc(u.nama)}</b></div></div>
     <div class="dua">${D.beban.map(k => `<div style="background:var(--gelap);border:1px solid var(--gelap2);border-radius:12px;padding:9px 12px"><span class="mini" style="color:#C7D0D6">${esc(k.nama)} · hari ini / minggu ini</span><b class="num" style="display:block">${k.hari} / ${k.minggu}</b></div>`).join('')}</div>
@@ -748,7 +804,7 @@ async function layarSpv(tab) {
   if (tab === 'kontraktor') return spvKontraktor();
 }
 async function spvPantau() {
-  const r = await api('pantau'); if (!r.ok) return layarGalat(r);
+  const r = await api('pantau', {}, { cepat: true }); if (!r.ok) return layarGalat(r);
   const D = r.data, R = D.ringkas;
   const warna = { siap: ['#E3F2EF', '#0B5A55', '#0B6B65'], melayani: ['#DDEBF7', '#1F4E78', '#1F4E78'], istirahat: ['#FCE9D2', '#6B3A00', '#E8A33D'], keluar: ['#FCE9D2', '#6B3A00', '#E8A33D'], telat: ['#FBE3E0', '#7A1F16', '#C0392B'], belum: ['#FBE3E0', '#7A1F16', '#C0392B'], off: ['#EEF1EF', '#4A5A66', '#C9D1CF'], fatigue: ['#EEF1EF', '#4A5A66', '#C9D1CF'], uji: ['#DDEBF7', '#1F4E78', '#8BB3D9'] };
   tampil(navSpv('pantau') + `<div class="isi" style="padding-top:14px">
@@ -769,7 +825,7 @@ async function spvPantau() {
 async function spvBooking() {
   const rentang = st.rentangB || 'hari', hi = kiniWit().slice(0, 10), plus = n => new Date(Date.parse(hi) + n * 864e5).toISOString().slice(0, 10);
   const [dari, sampai] = rentang === 'hari' ? [hi, hi] : rentang === 'besok' ? [plus(1), plus(1)] : [hi, plus(7)];
-  const r = await api('daftarBooking', { dari, sampai }); if (!r.ok) return layarGalat(r);
+  const r = await api('daftarBooking', { dari, sampai }, { cepat: true }); if (!r.ok) return layarGalat(r);
   const F = st.filterB || 'Semua', cari = (st.cariB || '').toLowerCase();
   const nm = { AKTIF: 'Menunggu', MENUNGGU_FAV: 'Minta favorit', BERLANGSUNG: 'Dilayani', HADIR: 'Hadir', SELESAI: 'Selesai', TIDAK_DATANG: 'Tidak datang', BATAL_PEMESAN: 'Batal (pemesan)', BATAL_SISTEM: 'Batal (telat)', BATAL_SPV: 'Batal (SPV)' };
   const data = r.data.filter(b => (F === 'Semua' || (F === 'Batal' ? b.status.indexOf('BATAL') === 0 : nm[b.status] === F)) && (!cari || (b.nama + b.id_badge + b.perusahaan + b.kode).toLowerCase().includes(cari)));
@@ -787,7 +843,7 @@ async function spvBooking() {
 }
 async function spvRekap() {
   const hi = kiniWit().slice(0, 10), dari = new Date(Date.parse(hi) - 6 * 864e5).toISOString().slice(0, 10);
-  const [r, s, a] = await Promise.all([api('rekap', { dari, sampai: hi }), api('saranTerbaru', { n: 15 }), api('riwayatApresiasi')]);
+  const [r, s, a] = await apiPaket([{ aksi: 'rekap', dari, sampai: hi }, { aksi: 'saranTerbaru', n: 15 }, { aksi: 'riwayatApresiasi' }], { cepat: true });
   if (!r.ok) return layarGalat(r);
   const D = r.data;
   tampil(navSpv('rekap') + `<div class="isi" style="padding-top:14px"><span class="label">Rekap ${tgl(D.dari, true)} – ${tgl(D.sampai, true)}</span>
@@ -805,7 +861,7 @@ async function spvRekap() {
   st.dataRekap = D;
 }
 async function spvAturan() {
-  const [rj, rp, rk] = await Promise.all([api('aturJadwal'), api('pengaturan'), api('karaokeKelola')]);
+  const [rj, rp, rk] = await apiPaket([{ aksi: 'aturJadwal' }, { aksi: 'pengaturan' }, { aksi: 'karaokeKelola' }], { cepat: true });
   if (!rj.ok) return layarGalat(rj);
   const J = rj.data, P = {}; (rp.data || []).forEach(x => P[x.kunci] = x.nilai);
   const pilih = (k, judul, ket, ops) => `<div class="kolom" style="gap:6px"><b style="font-size:14px">${judul}</b><span class="mini">${ket}</span><div class="tab" style="grid-template-columns:repeat(${ops.length},minmax(0,1fr))">${ops.map(o => `<button class="${String(P[k]) === String(o[0]) ? 'on' : ''}" data-act="setP" data-k="${k}" data-v="${o[0]}">${o[1]}</button>`).join('')}</div></div>`;
@@ -839,11 +895,12 @@ async function spvAturan() {
     ${pilih('BB_JEDA', 'Jeda bersih alat', 'Mengubah jumlah jam booking per hari.', [[10, '10 mnt'], [15, '15 mnt']])}
     ${pilih('KR_MINGGU', 'Karaoke hari Minggu', 'Tutup = dipakai maintenance alat & rapat koordinasi. Buka bila Minggu itu tidak dipakai.', [['Tutup', 'Tutup'], ['GDSK-PID', 'Buka untuk GDSK-PID']])}
     ${K ? `<span class="label">Karaoke · putaran ke-${K.putaran ? K.putaran.no : '-'} (mulai ${K.putaran ? tgl(K.putaran.mulai, true) : '-'})</span><div class="kartu" style="padding:6px 14px">${K.perusahaan.map(p => `<div class="antara" style="padding:8px 0;border-bottom:1px solid #EEF1EF"><span>${esc(p.nama)}${p.prioritas ? ' <span class="pil chip amber">prioritas</span>' : ''}</span><b class="num">${p.terpakai}/${p.jatah}</b></div>`).join('') || '<div class="kecil" style="padding:8px 0">Belum ada kontraktor. Tambahkan lewat Kelola kontraktor.</div>'}</div><a class="btn putih kcl" href="#/spv/kontraktor">Kelola kontraktor &amp; subkontraktor</a>` : ''}
-    <span class="mini">Setiap perubahan tercatat di tab Log (siapa, kapan, sebelum–sesudah).</span></div>`);
+    <span class="mini">Setiap perubahan tercatat di tab Log (siapa, kapan, sebelum–sesudah).</span>
+    <a class="btn putih kcl" href="#/diagnosa">Cek kecepatan aplikasi di HP ini</a></div>`);
 }
 
 async function spvKontraktor() {
-  const r = await api('daftarKontraktor'); if (!r.ok) return layarGalat(r);
+  const r = await api('daftarKontraktor', {}, { cepat: true }); if (!r.ok) return layarGalat(r);
   const D = r.data; st.kontraktor = D;
   const cari = (st.cariK || '').toLowerCase(), cocok = k => !cari || (k.nama + ' ' + k.nama_tampil + ' ' + k.induk).toLowerCase().includes(cari);
   const aktif = D.filter(k => k.aktif === 'Ya'), utama = aktif.filter(k => k.jenis === 'Kontraktor utama').length, sub = aktif.filter(k => k.jenis === 'Subkontraktor').length;
@@ -877,7 +934,7 @@ async function layarDashboard() {
   if (perluLogin(['SPV', 'ADMIN'])) return;
   const per = st.periode || 'minggu', hi = kiniWit().slice(0, 10), mundur = n => new Date(Date.parse(hi) - n * 864e5).toISOString().slice(0, 10);
   const dari = per === 'hari' ? hi : per === 'minggu' ? mundur(6) : hi.slice(0, 8) + '01';
-  const [r, s] = await Promise.all([api('rekap', { dari, sampai: hi }), api('saranTerbaru', { n: 5 })]);
+  const [r, s] = await apiPaket([{ aksi: 'rekap', dari, sampai: hi }, { aksi: 'saranTerbaru', n: 5 }], { cepat: true });
   if (!r.ok) return layarGalat(r);
   const D = r.data, K = D.kapster.filter(k => k.aktif === 'Ya' || k.total);
   const sum = f => K.reduce((a, k) => a + (f(k) || 0), 0);
@@ -908,6 +965,19 @@ async function layarDashboard() {
       <button class="btn putih" data-act="unduhRekap">Unduh laporan Excel</button></div></div>`, true);
   st.dataRekap = D;
   clearTimeout(st.tDash); st.tDash = setTimeout(() => { if (location.hash === '#/spv/dashboard') layarDashboard(); }, 30000);
+}
+
+/* ---- Diagnosa kecepatan: bukti nyata dari HP di site ---- */
+function layarDiagnosa() {
+  let L = []; try { L = JSON.parse(localStorage.getItem('rf_diag') || '[]'); } catch (e) {}
+  const med = a => { a = a.filter(x => x != null).sort((x, y) => x - y); return a.length ? a[Math.floor(a.length / 2)] : null; };
+  const f = ms => ms == null ? '–' : (ms / 1000).toFixed(1) + ' dtk';
+  const tot = med(L.map(x => x.t)), srv = med(L.map(x => x.s)), jar = med(L.filter(x => x.s != null).map(x => x.t - x.s));
+  tampil(kepala('Cek kecepatan', 'Diukur langsung dari HP ini · ' + L.length + ' permintaan terakhir', '#/') + `<div class="isi">
+    <div class="tiga">${[[f(tot), 'Total (median)'], [f(srv), 'Proses server'], [f(jar), 'Sinyal + Google']].map(x => `<div class="kartu" style="padding:10px;text-align:center"><b class="num" style="font-size:18px;display:block">${x[0]}</b><span class="mini">${x[1]}</span></div>`).join('')}</div>
+    <div class="kecil"><b>Total</b> = dari tombol ditekan sampai data diterima HP. <b>Proses server</b> = kerja Apps Script membaca Google Sheet. <b>Sinyal + Google</b> = sisanya: perjalanan data lewat jaringan site dan antrean server Google. Bila bagian ini paling besar, penyebabnya jaringan/server Google, bukan aplikasi.</div>
+    <div class="dua"><button class="btn kcl" data-act="ujiCepat">Uji sekarang (3×)</button><button class="btn putih kcl" data-act="hapusDiag">Hapus catatan</button></div>
+    <div class="kartu" style="padding:4px 14px">${L.map(x => `<div class="antara" style="padding:8px 0;border-bottom:1px solid #EEF1EF;font-size:13px"><span><b>${esc(x.a)}</b><br><span class="mini">${esc(x.w)}${x.c ? ' · dari simpanan server' : ''}</span></span><span class="num" style="text-align:right"><b>${f(x.t)}</b><br><span class="mini">server ${f(x.s)}</span></span></div>`).join('') || '<div class="kecil" style="padding:10px 0">Belum ada catatan. Pakai aplikasi sebentar, lalu buka halaman ini lagi.</div>'}</div></div>`);
 }
 
 /* ================= AKSI ================= */
@@ -945,11 +1015,11 @@ document.addEventListener('click', async e => {
   else if (a === 'ingat') { const on = el.getAttribute('aria-checked') !== 'true'; el.setAttribute('aria-checked', on); el.querySelector('.kotak').classList.toggle('on', on); }
   else if (a === 'kirimB' || a === 'kirimK') {
     const karaoke = a === 'kirimK', d = ambilForm(karaoke); if (!d) return;
-    el.disabled = true; el.textContent = t('Memproses…');
+    el.disabled = true; el.textContent = t('Mengamankan jadwalmu…');
     const p = { nama: d.nama, perusahaan_id: d.pt, id_badge: d.id, wa: d.wa };
     const r = karaoke ? await api('pesanKaraoke', Object.assign(p, { tanggal: pilihan.k, peserta: d.ps })) : await api('pesanBarber', Object.assign(p, { tanggal: pilihan.b.tanggal, jam: pilihan.b.jam, fav_kapster_id: pilihan.b.fav || '', layanan_id: (simpanJ('layanan') || {}).id || '', setuju_pria: !!st.setujuPria }));
-    if (!r.ok) { toast(pesanGalat(r), true); el.disabled = false; el.textContent = t('Konfirmasi booking'); if (r.error.kode === 'PENUH' || r.error.kode === 'WANITA') { pilihan.b = null; pilihan.k = null; setTimeout(() => go(karaoke ? '#/karaoke' : '#/barber/jam'), 1200); } return; }
-    simpanKode(r.data, d.id); pilihan.b = null; pilihan.k = null; st.setujuPria = false; simpanJ('pilihB', null); go('#/sukses/' + r.data.kode);
+    if (!r.ok) { toast(pesanGalat(r), true); el.disabled = false; el.textContent = t('Booking sekarang'); if (r.error.kode === 'PENUH' || r.error.kode === 'WANITA') { pilihan.b = null; pilihan.k = null; setTimeout(() => go(karaoke ? '#/karaoke' : '#/barber/jam'), 1200); } return; }
+    st.bookingBaru = r.data; simpanKode(r.data, d.id); pilihan.b = null; pilihan.k = null; st.setujuPria = false; simpanJ('pilihB', null); go('#/sukses/' + r.data.kode);
   }
   else if (a === 'salin') { try { await navigator.clipboard.writeText(k); toast(st.lang === 'en' ? 'Code copied' : 'Kode disalin'); } catch (er) { toast(k); } }
   else if (a === 'cari') {
@@ -967,13 +1037,15 @@ document.addEventListener('click', async e => {
   else if (a === 'kirimNilai') {
     const N = st.nilai, x = (simpanJ('kode') || []).find(z => z.kode === N.kode); el.disabled = true;
     const r = await jalankan('kirimSurvei', { kode: N.kode, id_badge: x.id, nilai: N.n, aspek: N.aspek, saran: document.getElementById('n-saran').value });
-    if (r) { st.nilai = null; tampil(`<div class="isi" style="align-items:center;justify-content:center;text-align:center;gap:14px;min-height:80vh"><div style="width:84px;height:84px;border-radius:99px;background:var(--hijau);display:flex;align-items:center;justify-content:center;animation:pop .42s ease-out both">${IK.cek}</div><h1 style="font-size:26px">${t('Terima kasih!')}</h1><p class="kecil" style="font-size:15px;margin:0">${N.n >= 4 ? (st.lang === 'en' ? 'Your rating helps the SPV recognise great barbers.' : 'Penilaian kamu membantu SPV memberi apresiasi kepada kapster yang bekerja baik.') : (st.lang === 'en' ? 'Your feedback goes straight to the SPV.' : 'Masukan kamu langsung diterima SPV untuk ditindaklanjuti.')}</p><a class="btn hitam" href="#/" style="width:auto;padding:14px 22px">${t('Ke menu awal')}</a></div>`); }
+    if (r) { st.nilai = null; tampil(`<div class="isi" style="align-items:center;justify-content:center;text-align:center;gap:14px;min-height:80vh"><div style="width:84px;height:84px;border-radius:99px;background:var(--hijau);display:flex;align-items:center;justify-content:center;animation:pop .42s ease-out both">${IK.cek}</div><h1 style="font-size:26px">${t('Terima kasih!')}</h1><p class="kecil" style="font-size:15px;margin:0">${N.n >= 4 ? (st.lang === 'en' ? 'Your rating helps the SPV recognise great barbers.' : 'Penilaian kamu membantu SPV memberi apresiasi kepada kapster yang bekerja baik.') : (st.lang === 'en' ? 'Your feedback goes straight to the SPV.' : 'Masukan kamu langsung diterima SPV untuk ditindaklanjuti.')}</p><a class="btn hitam" href="#/" style="width:auto;padding:14px 22px">${t('Kembali ke beranda')}</a></div>`); }
     else el.disabled = false;
   }
   else if (a === 'kirimSaran') { const isi = document.getElementById('s-isi').value; const r = await jalankan('kirimSurvei', { umum: true, saran: isi, nama: document.getElementById('s-nama').value }, t('Terima kasih!')); if (r) go('#/'); }
   else if (a === 'pilihK') { pilihan.k = el.dataset.t; st.lokal = true; st.gulir = window.scrollY; layarKaraoke(); }
   else if (a === 'keFormK') go('#/karaoke/form');
   else if (a === 'ulang') router();
+  else if (a === 'hapusDiag') { try { localStorage.removeItem('rf_diag'); } catch (e) {} layarDiagnosa(); }
+  else if (a === 'ujiCepat') { el.disabled = true; for (let i = 0; i < 3; i++) { muatMulai('paket'); try { await kirim('uji', { aksi: 'info', bahasa: st.lang, n: i }, {}); } catch (e) {} muatSelesai(); } layarDiagnosa(); }
   /* petugas */
   else if (a === 'pin') { if (k === '⌫') st.loginPin = st.loginPin.slice(0, -1); else if (st.loginPin.length < 6) st.loginPin += k; gambarTitik(); if (st.loginPin.length === 6) document.querySelector('[data-act="masuk"]').focus(); }
   else if (a === 'masuk') {
@@ -1046,7 +1118,7 @@ function hasilPindah(judul, data, sebab) {
   const d = data.dipindah || [];
   lembar(`<b style="font-size:18px">${judul}</b><span class="kecil">${(data.dialihkan || []).length} booking dialihkan ke kapster lain · ${d.length} dipindah/dibatalkan.${d.length ? ' Kabari pemesannya:' : ''}</span>${d.map(x => `<a class="btn putih kcl" target="_blank" rel="noopener" href="https://wa.me/${x.wa}?text=${encodeURIComponent('Halo ' + x.nama + ', booking ' + x.kode + (x.ke ? ' dipindah ke ' + x.ke + ' WIT karena ' + sebab + '.' : ' terpaksa dibatalkan karena ' + sebab + '. Silakan pesan jadwal lain lewat aplikasi.') + ' Cek di menu Booking Saya. Terima kasih.')}">WA ${esc(x.nama)} · ${x.ke ? 'pindah ' + esc(x.ke) : 'batal'}</a>`).join('')}<button class="btn" data-act="tutup">Tutup</button>`);
 }
-function layarNilaiUlang() { api('cekBooking', { kode: st.nilai.kode, id_badge: ((simpanJ('kode') || []).find(z => z.kode === st.nilai.kode) || {}).id }).then(r => r.ok && gambarNilai(r.data)); }
+function layarNilaiUlang() { st.gulir = window.scrollY; gambarNilai(st.nilaiB); } // ketuk bintang = langsung, tanpa server
 function gambarKeluar() {
   const K = st.kel, chip = on => `border-radius:999px;padding:10px 14px;min-height:44px;font-weight:700;font-size:14px;${on ? 'background:#0B6B65;color:#fff;border:1.5px solid #0B6B65' : 'background:#fff;border:1.5px solid #C9D1CF'}`;
   lembar(`<div class="antara"><b style="font-size:18px">Keluar sebentar</b><button data-act="tutup" aria-label="Tutup" style="background:#EEF1EF;border:0;border-radius:10px;width:40px;height:40px;font-size:18px">×</button></div>
@@ -1058,7 +1130,7 @@ function gambarKeluar() {
 
 /* ================= ROUTER ================= */
 async function router(latar) {
-  if (!latar) { tutupLembar(); const no = st.nav = (st.nav || 0) + 1; setTimeout(() => { if (st.nav === no && st.dirender !== no) memuat(); }, 150); }
+  if (!latar) { tutupLembar(); st.animasi = true; const no = st.nav = (st.nav || 0) + 1; setTimeout(() => { if (st.nav === no && st.dirender !== no) memuat(); }, 150); }
   const h = location.hash || '#/', seg = h.replace(/^#\//, '').split('/');
   try {
     if (!st.info && seg[0] !== 'petugas' && seg[0] !== 'kapster' && seg[0] !== 'spv') memuat();
@@ -1072,6 +1144,7 @@ async function router(latar) {
       case 'nilai': return await layarNilai(seg[1]);
       case 'saran': await pastikanInfo(); return layarSaran();
       case 'papan': return await layarPapan();
+      case 'diagnosa': return layarDiagnosa();
       case 'petugas': return st.petugas ? go(st.petugas.petugas.peran === 'KAPSTER' ? '#/kapster' : '#/spv/pantau') : await layarLogin();
       case 'kapster': await pastikanInfo(); return seg[1] === 'semua' ? await layarSemua() : await layarKapster();
       case 'spv': await pastikanInfo(); return seg[1] === 'dashboard' ? await layarDashboard() : await layarSpv(seg[1]);
